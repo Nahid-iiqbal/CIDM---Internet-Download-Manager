@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CIDM</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; width: 340px; padding: 16px; box-sizing: border-box;
+           font-family: "Segoe UI", system-ui, sans-serif; font-size: 13px;
+           background: #1b1d26; color: #e6e8ee; }
+    h1 { font-size: 16px; margin: 0 0 12px; }
+    .badge { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px;
+             border-radius: 999px; font-weight: 600; font-size: 12px; }
+    .badge::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+    .badge.on  { background: rgba(34,197,94,.15);  color: #4ade80; }
+    .badge.off { background: rgba(239,68,68,.15);  color: #f87171; }
+    .badge.wait { background: rgba(148,163,184,.15); color: #94a3b8; }
+    .row { display: flex; align-items: center; justify-content: space-between;
+           margin-top: 12px; padding: 10px 12px; background: #232634; border-radius: 8px; }
+    .switch { position: relative; width: 42px; height: 22px; flex: none; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; inset: 0; background: #3a405a; border-radius: 22px;
+              cursor: pointer; transition: background .2s; }
+    .slider::before { content: ""; position: absolute; height: 16px; width: 16px; left: 3px; top: 3px;
+                      background: #fff; border-radius: 50%; transition: transform .2s; }
+    input:checked + .slider { background: #3b82f6; }
+    input:checked + .slider::before { transform: translateX(20px); }
+    .primary-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;
+                   background: #3b82f6; color: #fff; border: 0; border-radius: 8px; padding: 9px 12px;
+                   font-size: 13px; font-weight: 600; cursor: pointer; transition: background .15s;
+                   margin-top: 10px; }
+    .primary-btn:hover { background: #4f8ff7; }
+    .primary-btn:disabled { background: #3a405a; cursor: not-allowed; }
+    .primary-btn.success { background: #22c55e; }
+    h2 { font-size: 12px; margin: 16px 0 8px; color: #9aa3bd; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+    #streams-list { display: flex; flex-direction: column; gap: 6px; max-height: 250px; overflow-y: auto; }
+    .item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: #232634; border-radius: 8px; }
+    .tag { flex: none; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 4px; color: #fff; text-transform: uppercase; }
+    .tag.hls { background: #a855f7; }
+    .tag.dash { background: #f59e0b; color: #1b1d26; }
+    .tag.mp4 { background: #3b82f6; }
+    .tag.webm { background: #10b981; }
+    .meta { flex: 1; min-width: 0; }
+    .meta .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; font-weight: 500; }
+    .meta .hint-text { font-size: 11px; color: #9aa3bd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    button.dl-btn { flex: none; background: #2b3047; color: #fff; border: 1px solid #3d4466; border-radius: 6px;
+                    padding: 5px 11px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background .15s; }
+    button.dl-btn:hover { background: #3b82f6; border-color: #3b82f6; }
+    button.dl-btn:disabled { background: #232634; color: #64748b; border-color: transparent; cursor: default; }
+    button.dl-btn.sent { background: #22c55e; border-color: #22c55e; color: #fff; }
+    .empty { font-size: 12px; color: #9aa3bd; line-height: 1.4; padding: 4px 0; }
+    #msg { min-height: 16px; margin-top: 8px; font-size: 12px; color: #f87171; }
+    .hint { margin: 12px 0 0; font-size: 11px; color: #9aa3bd; line-height: 1.4; }
+  </style>
+</head>
+<body>
+  <h1>CIDM Integration</h1>
+  <span id="status" class="badge wait">Checking...</span>
+
+  <div class="row">
+    <span>Intercept Browser Downloads</span>
+    <label class="switch">
+      <input type="checkbox" id="toggle">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <button id="download-tab-btn" class="primary-btn">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+      <polyline points="7 10 12 15 17 10"/>
+      <line x1="12" y1="15" x2="12" y2="3"/>
+    </svg>
+    Download Current Tab
+  </button>
+
+  <h2>Detected Videos on This Page</h2>
+  <div id="streams-list"></div>
+  <div id="msg"></div>
+  <p class="hint">Sniffs HLS (.m3u8), DASH (.mpd), and direct MP4/WEBM web streams automatically.</p>
+  <script src="popup.js"></script>
+</body>
+</html>
