@@ -108,8 +108,10 @@ from engine import (
     format_speed,
     get_active_interfaces,
     get_category_for_filename,
+    is_generic_name,
     is_hls_url,
     is_media_url,
+    normalize_download_url,
     probe_media,
     probe_url,
     resolve_destination_folder,
@@ -2317,6 +2319,7 @@ class AddDownloadDialog(QDialog):
     ):
         super().__init__(parent)
         self.settings = settings or {}
+        url = normalize_download_url(url)
         self.kind = kind
         self.origin = origin or ""
         self.stream_type = (stream_type or "").lower()
@@ -2349,12 +2352,6 @@ class AddDownloadDialog(QDialog):
             user_agent,
             referer,
         )
-        self._name_edited = bool(filename)
-        self._gen = 0
-        self._probe_out: Optional[tuple[int, bool, Any, Any]] = None
-        self._probe_lock = threading.Lock()
-        self._probed_media_result = None
-
         self.url_edit = QLineEdit(url)
         self.url_edit.setPlaceholderText(
             "https://example.com/file.zip or YouTube URL"
@@ -2385,6 +2382,13 @@ class AddDownloadDialog(QDialog):
             self.sub_mode_combo.setCurrentIndex(1)
 
         clean_initial_name = sanitize_filename(filename) if filename else ""
+        if clean_initial_name and is_generic_name(clean_initial_name):
+            clean_initial_name = ""
+        self._name_edited = False
+        self._gen = 0
+        self._probe_out: Optional[tuple[int, bool, Any, Any]] = None
+        self._probe_lock = threading.Lock()
+        self._probed_media_result = None
         self.name_edit = QLineEdit(clean_initial_name)
         self.name_edit.setPlaceholderText(
             "Detecting from server / media..."
@@ -2396,7 +2400,10 @@ class AddDownloadDialog(QDialog):
             guess = filename_from_url(url)
             if self.is_hls and guess.lower().endswith((".m3u8", ".m3u")):
                 guess = os.path.splitext(guess)[0]
-            self.name_edit.setText(guess)
+            if not is_generic_name(guess):
+                self.name_edit.setText(guess)
+            else:
+                self.name_edit.setText("")
         self.info_label = QLabel("")
         self.info_label.setStyleSheet("color: #9aa0aa; font-size: 12px;")
 
@@ -2546,7 +2553,12 @@ class AddDownloadDialog(QDialog):
             self.dir_edit.setText(d)
 
     def _start_probe(self):
-        url = self.url_edit.text().strip()
+        raw_url = self.url_edit.text().strip()
+        url = normalize_download_url(raw_url)
+        if url != raw_url:
+            self.url_edit.blockSignals(True)
+            self.url_edit.setText(url)
+            self.url_edit.blockSignals(False)
         if not url.lower().startswith(("http://", "https://")):
             self.info_label.setText("")
             self.format_label.setVisible(False)
@@ -2707,8 +2719,11 @@ class AddDownloadDialog(QDialog):
             )
             self.info_label.setText(f"{size}  ·  {rng}")
             self.info_label.setStyleSheet("color: #9aa0aa; font-size: 12px;")
-            if u_res.filename and not self._name_edited:
-                self.name_edit.setText(u_res.filename)
+            if u_res.filename:
+                cur_text = self.name_edit.text().strip()
+                if not self._name_edited or is_generic_name(cur_text):
+                    self.name_edit.setText(u_res.filename)
+                    self._name_edited = False
 
     def _on_format_changed(self):
         if not self.is_media or not self._probed_media_result:
@@ -5300,9 +5315,11 @@ class MainWindow(QMainWindow):
 
     def add_url(self, prefill: Optional[dict] = None):
         p = prefill or {}
+        raw_url = p.get("url", "")
+        url = normalize_download_url(raw_url)
         dlg = AddDownloadDialog(
             self,
-            url=p.get("url", ""),
+            url=url,
             filename=p.get("filename", ""),
             cookies=p.get("cookies", ""),
             user_agent=p.get("user_agent", ""),
@@ -6017,9 +6034,23 @@ class MainWindow(QMainWindow):
             ".epub",
         )
         clean_url = text.split("?")[0].lower()
+        is_cloud_url = any(
+            h in text.lower()
+            for h in (
+                "drive.google.com",
+                "drive.usercontent.google.com",
+                "dropbox.com",
+                "mediafire.com",
+                "mega.nz",
+                "mega.io",
+                "onedrive.live.com",
+                "1drv.ms",
+            )
+        )
         if (
             any(clean_url.endswith(ext) for ext in downloadable_exts)
             or is_media_url(text)
+            or is_cloud_url
         ):
             self._last_clipboard_url = text
             self.add_url({"url": text})

@@ -705,6 +705,19 @@ def filename_from_url(url: str) -> str:
     return sanitize_filename(urllib.parse.unquote(base))
 
 
+def is_generic_name(name: Optional[str]) -> bool:
+    """Return True if filename is a placeholder or generic fallback (e.g. 'download', 'file', or has no extension)."""
+    if not name:
+        return True
+    s = str(name).strip().lower()
+    stem, ext = os.path.splitext(s)
+    if stem in ("download", "file", "view", "uc", "open", "index", "export", "stream", "get", "media"):
+        return True
+    if not ext:
+        return True
+    return False
+
+
 def build_headers(
     cookies: Optional[str] = None,
     user_agent: Optional[str] = None,
@@ -743,6 +756,34 @@ class ProbeResult:
     final_url: str = ""
 
 
+# --------------------------------------------------------------------------- #
+# Cloud Storage & Direct Download URL Normalization
+# --------------------------------------------------------------------------- #
+def normalize_download_url(url: str) -> str:
+    """Normalize file sharing and cloud storage URLs to direct download endpoints."""
+    if not url or not isinstance(url, str):
+        return url
+    u = url.strip()
+
+    # Google Drive view/open/uc URLs -> direct download endpoint
+    m = re.search(r"drive\.google\.com/file/d/([a-zA-Z0-9_-]+)", u, re.IGNORECASE)
+    if not m:
+        m = re.search(r"drive\.google\.com/open\?.*?id=([a-zA-Z0-9_-]+)", u, re.IGNORECASE)
+    if not m:
+        m = re.search(r"drive\.google\.com/uc\?.*?id=([a-zA-Z0-9_-]+)", u, re.IGNORECASE)
+    if not m:
+        m = re.search(r"drive\.usercontent\.google\.com/download\?.*?id=([a-zA-Z0-9_-]+)", u, re.IGNORECASE)
+    if m:
+        file_id = m.group(1)
+        return f"https://drive.usercontent.google.com/download?id={file_id}&export=download&confirm=t"
+
+    # Dropbox share link dl=0 -> dl=1
+    if "dropbox.com/" in u and "dl=0" in u:
+        return u.replace("dl=0", "dl=1")
+
+    return u
+
+
 def probe_url(
     url: str,
     cookies: Optional[str] = None,
@@ -752,6 +793,7 @@ def probe_url(
 ) -> ProbeResult:
     """HEAD the URL (following redirects). If HEAD fails or gives no length,
     fall back to a 1-byte ranged GET which also reveals range support."""
+    url = normalize_download_url(url)
     size, ranges, disposition, final_url = 0, False, None, url
     head_ok = False
     try:
@@ -807,6 +849,29 @@ def probe_url(
                     "Content-Disposition"
                 )
                 final_url = r.url or final_url
+
+                # Check for Google Drive virus warning HTML confirmation page
+                if "google.com" in final_url or "googleusercontent.com" in final_url:
+                    c_type = (r.headers.get("Content-Type") or "").lower()
+                    if "text/html" in c_type:
+                        try:
+                            chunk = next(r.iter_content(32768), b"").decode("utf-8", errors="ignore")
+                            m_confirm = re.search(r'href="(/uc\?[^"]*confirm=[^"]*)"', chunk) or re.search(r'href="(https://drive\.usercontent\.google\.com/download\?[^"]*confirm=[^"]*)"', chunk)
+                            if m_confirm:
+                                conf_link = m_confirm.group(1).replace("&amp;", "&")
+                                if conf_link.startswith("/"):
+                                    conf_link = "https://drive.google.com" + conf_link
+                                return probe_url(conf_link, cookies, user_agent, referer, timeout)
+                            m_token = re.search(r'name="confirm"\s+value="([^"]+)"', chunk) or re.search(r'confirm=([0-9A-Za-z_-]+)', chunk)
+                            if m_token:
+                                token = m_token.group(1)
+                                if "confirm=" not in final_url:
+                                    confirmed_url = f"{final_url}&confirm={token}"
+                                else:
+                                    confirmed_url = re.sub(r'confirm=[^&]*', f'confirm={token}', final_url)
+                                return probe_url(confirmed_url, cookies, user_agent, referer, timeout)
+                        except Exception:
+                            pass
             finally:
                 r.close()
         except requests.RequestException as exc:
@@ -844,7 +909,7 @@ class DownloadTask:
         proxy_pool_include_direct: bool = True,
     ):
         self.id = next(self._ids)
-        self.url = url
+        self.url = normalize_download_url(url)
         self.save_dir = save_dir
         self.requested_filename = sanitize_filename(filename or "") or None
         self.filename = self.requested_filename or ""
@@ -1202,11 +1267,22 @@ class DownloadTask:
             return False
 
     def _choose_filename(self, detected: str) -> None:
-        if self._reuse_existing and self.filename:
+        if self._reuse_existing and self.filename and not is_generic_name(self.filename):
             return
-        name = sanitize_filename(
-            self.requested_filename or detected
-        ) or "download"
+
+        # If requested_filename is generic (e.g. 'download' or missing extension)
+        # but the server reported a real filename, prefer the server's detected filename!
+        if is_generic_name(self.requested_filename) and detected and not is_generic_name(detected):
+            name = sanitize_filename(detected)
+        elif self.requested_filename and not is_generic_name(self.requested_filename):
+            name = sanitize_filename(self.requested_filename)
+        elif detected:
+            name = sanitize_filename(detected)
+        elif self.requested_filename:
+            name = sanitize_filename(self.requested_filename)
+        else:
+            name = "download"
+
         if not self._reuse_existing:
             full = os.path.join(self.save_dir, name)
             if os.path.exists(full) and not self._state_matches(full + STATE_SUFFIX):
@@ -2568,6 +2644,34 @@ _COMMON_MEDIA_DOMAINS = (
     "fb.watch",
 )
 
+_FILE_HOST_DOMAINS = (
+    "drive.google.com",
+    "docs.google.com",
+    "drive.usercontent.google.com",
+    "dropbox.com",
+    "dl.dropboxusercontent.com",
+    "onedrive.live.com",
+    "1drv.ms",
+    "sharepoint.com",
+    "mega.nz",
+    "mega.io",
+    "mediafire.com",
+    "box.com",
+    "github.com",
+    "raw.githubusercontent.com",
+    "gitlab.com",
+    "sourceforge.net",
+    "archive.org",
+)
+
+_EXCLUDED_EXTRACTORS = {
+    "googledrive",
+    "googledrive:folder",
+    "dropbox",
+    "box",
+    "generic",
+}
+
 _extractors_cache: Optional[list] = None
 
 
@@ -2591,6 +2695,13 @@ def is_media_url(url: str) -> bool:
     if ".m3u8" in url_lower or ".mpd" in url_lower:
         return True
 
+    # Cloud storage and file hosting domains are always direct file downloads, never yt-dlp media
+    if any(
+        hostname == d or hostname.endswith("." + d)
+        for d in _FILE_HOST_DOMAINS
+    ):
+        return False
+
     # Common streaming platforms
     if any(
         hostname == d or hostname.endswith("." + d)
@@ -2613,7 +2724,7 @@ def is_media_url(url: str) -> bool:
             _extractors_cache = [
                 ie
                 for ie in yt_dlp.extractor.gen_extractors()
-                if ie.IE_NAME != "generic"
+                if ie.IE_NAME.lower() not in _EXCLUDED_EXTRACTORS
             ]
         return any(ie.suitable(url) for ie in _extractors_cache)
     except Exception:
@@ -3755,6 +3866,7 @@ def create_task(
     proxy_pool_enabled: bool = False,
     proxy_pool_include_direct: bool = True,
 ) -> DownloadTask:
+    url = normalize_download_url(url)
     if filename:
         if auto_categorize:
             save_dir = resolve_destination_folder(

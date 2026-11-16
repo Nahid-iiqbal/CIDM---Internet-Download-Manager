@@ -1,17 +1,21 @@
-// popup.js - CIDM Stream & Subtitle Detection Popup
+// popup.js - CIDM Universal Download & Stream Detection Popup
 const BRIDGE = "http://127.0.0.1:9632";
 const statusEl = document.getElementById("status");
 const toggle = document.getElementById("toggle");
+const quickUrlInput = document.getElementById("quick-url");
+const quickBtn = document.getElementById("quick-btn");
 const downloadTabBtn = document.getElementById("download-tab-btn");
 const streamsListEl = document.getElementById("streams-list");
+const streamCountEl = document.getElementById("stream-count");
 const msgEl = document.getElementById("msg");
 
 let activeTabId = null;
 let lastSignature = "";
 
 function setStatus(online) {
-  statusEl.textContent = online ? "Desktop App Connected" : "Desktop App Offline";
+  statusEl.textContent = online ? "Connected" : "Offline";
   statusEl.className = "badge " + (online ? "on" : "off");
+  if (quickBtn) quickBtn.disabled = !online;
 }
 
 async function checkConnection() {
@@ -37,10 +41,15 @@ function renderStreams(list, subtitles) {
   lastSignature = signature;
   streamsListEl.textContent = "";
 
+  const count = (list || []).length;
+  if (streamCountEl) {
+    streamCountEl.textContent = String(count);
+  }
+
   if (!list || !list.length) {
     const p = document.createElement("div");
     p.className = "empty";
-    p.textContent = "No video streams detected yet. Start playing a video on this page or click 'Download Current Tab' above.";
+    p.textContent = "No active video streams detected. Standard file downloads (ZIP, EXE, ISO, PDF, etc.) are intercepted automatically.";
     streamsListEl.appendChild(p);
     return;
   }
@@ -70,8 +79,8 @@ function renderStreams(list, subtitles) {
     if (!hostHint) {
       try { hostHint = new URL(stream.url).hostname; } catch (_e) { hostHint = ""; }
     }
-    const subHint = subCount > 0 ? ` • ${subCount} Subtitle(s) Detected` : "";
-    hint.textContent = (hostHint ? `${hostHint} - ${stType.toUpperCase()} Stream` : `${stType.toUpperCase()} Stream`) + subHint;
+    const subHint = subCount > 0 ? ` • ${subCount} Subtitle(s)` : "";
+    hint.textContent = (hostHint ? `${hostHint} - ${stType.toUpperCase()}` : stType.toUpperCase()) + subHint;
 
     meta.append(name, hint);
 
@@ -123,6 +132,57 @@ async function loadStreams() {
       renderStreams(storedStreams[`streams:${activeTabId}`] || [], storedSubs[`subtitles:${activeTabId}`] || []);
     } catch (_err) {}
   }
+}
+
+async function triggerQuickDownload() {
+  if (!quickUrlInput) return;
+  const url = quickUrlInput.value.trim();
+  if (!url) {
+    msgEl.textContent = "Please enter or paste a valid download URL.";
+    return;
+  }
+  if (!/^https?:\/\//i.test(url)) {
+    msgEl.textContent = "URL must start with http:// or https://";
+    return;
+  }
+
+  msgEl.textContent = "";
+  quickBtn.disabled = true;
+  const origText = quickBtn.textContent;
+  quickBtn.textContent = "Sending...";
+
+  try {
+    const res = await chrome.runtime.sendMessage({
+      type: "quickDownload",
+      url,
+    });
+    if (res && res.ok) {
+      quickBtn.textContent = "Sent!";
+      quickUrlInput.value = "";
+      setTimeout(() => {
+        quickBtn.textContent = origText;
+        quickBtn.disabled = false;
+      }, 1800);
+    } else {
+      throw new Error((res && res.error) || "Failed to send download to CIDM.");
+    }
+  } catch (err) {
+    msgEl.textContent = String(err.message || err);
+    quickBtn.textContent = origText;
+    quickBtn.disabled = false;
+  }
+}
+
+if (quickBtn) {
+  quickBtn.addEventListener("click", triggerQuickDownload);
+}
+
+if (quickUrlInput) {
+  quickUrlInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      triggerQuickDownload();
+    }
+  });
 }
 
 if (downloadTabBtn) {

@@ -87,12 +87,35 @@ idm2/
 
 ## Installation & Setup
 
-### Prerequisites
-- **Operating System:** Windows 10 or Windows 11 (64-bit recommended)
-- **Python:** Python 3.10 or higher
-- **FFmpeg (Optional but Recommended):** Place `ffmpeg.exe` into `vendor/bin/` or add it to system `PATH` for video grabbing.
+### 📥 Option 1: Install from GitHub Releases (Recommended for Users)
 
-### Quick Start (Running from Source)
+The easiest way to use CIDM is using the pre-built Windows installer or portable package:
+
+1. **Download the Latest Release:**
+   - Head over to the [Releases](https://github.com/your-username/cidm/releases) page on GitHub.
+   - Under the latest version (e.g., `v1.0.0`), download:
+     - **`CIDM_Setup.exe`** — Full Windows installer with Start Menu & desktop shortcuts and automatic startup options.
+     - *(Alternative)* **`CIDM_Portable_Windows_x64_v1.0.0.zip`** — Standalone portable version (no installation required; extract and run `CIDM.exe`).
+
+2. **Run the Installer:**
+   - Double-click **`CIDM_Setup.exe`**.
+   - *(Note: If Windows SmartScreen appears with "Windows protected your PC", click **More info** and then select **Run anyway**).*
+   - Select your preferred options:
+     - ☑ **Create a desktop shortcut**
+     - ☑ **Run CIDM in the background on Windows startup** *(recommended for background clipboard monitoring and browser capture)*.
+   - Click **Install** and then click **Finish** to launch CIDM.
+
+3. **Complete First-Run Browser Extension Setup:**
+   - When CIDM launches for the first time, the **CIDM Browser Extension Setup** wizard will automatically appear.
+   - Click **Install in Google Chrome**, **Install in Microsoft Edge**, or **Install in Brave**.
+   - Your browser will open to its extensions tab with the extension path already copied to your clipboard.
+   - Turn **ON** **Developer mode** (top-right corner), click **Load unpacked** (top-left), press `Ctrl+V` to paste the path, and click **Select Folder**. Done!
+
+---
+
+### 🛠️ Option 2: Run from Source (Developers)
+
+If you want to contribute or run CIDM directly from the Python source code:
 
 1. **Clone the repository:**
    ```bash

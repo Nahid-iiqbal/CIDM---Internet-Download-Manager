@@ -111,13 +111,42 @@ def find_or_bundle_ffmpeg(base_dir: Path) -> Path | None:
     return None
 
 
+def terminate_running_instances() -> None:
+    """Terminate any running CIDM or pyidm processes locking dist/ files."""
+    if os.name != "nt":
+        return
+    for proc_name in ("CIDM.exe", "cidm.exe", "pyidm.exe", "PyIDM.exe"):
+        try:
+            subprocess.run(
+                ["taskkill.exe", "/F", "/IM", proc_name, "/T"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except Exception:
+            pass
+    import time
+    time.sleep(0.5)
+
+
 def clean_build_artifacts(base_dir: Path) -> None:
+    print("[*] Terminating any running CIDM background instances...")
+    terminate_running_instances()
+
     print("[*] Cleaning previous build artifacts...")
+    import stat
+
+    def _on_rm_error(func, path, exc):
+        try:
+            os.chmod(path, stat.S_IWRITE)
+            func(path)
+        except Exception:
+            pass
+
     for folder in ("build", "dist"):
         p = base_dir / folder
         if p.exists():
             try:
-                shutil.rmtree(p)
+                shutil.rmtree(p, onexc=_on_rm_error)
                 print(f"    Removed {p}")
             except Exception as e:
                 print(f"    Warning: Could not remove {p}: {e}")
@@ -135,11 +164,16 @@ def find_inno_setup_compiler() -> Path | None:
     if cmd:
         return Path(cmd)
 
+    local_app_data = os.environ.get("LOCALAPPDATA", "")
+    program_files = os.environ.get("ProgramFiles", r"C:\Program Files")
+    program_files_x86 = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
+
     candidates = [
+        Path(local_app_data) / r"Programs\Inno Setup 6\ISCC.exe",
+        Path(program_files_x86) / r"Inno Setup 6\ISCC.exe",
+        Path(program_files) / r"Inno Setup 6\ISCC.exe",
         Path(r"C:\Program Files (x86)\Inno Setup 6\ISCC.exe"),
         Path(r"C:\Program Files\Inno Setup 6\ISCC.exe"),
-        Path(os.environ.get("LOCALAPPDATA", "")) /
-        r"Programs\Inno Setup 6\ISCC.exe",
     ]
     for c in candidates:
         if c.exists():

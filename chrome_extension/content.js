@@ -405,4 +405,54 @@
   // Handle native HTML5 fullscreen changes
   document.addEventListener("fullscreenchange", reparentAllOverlays);
   document.addEventListener("webkitfullscreenchange", reparentAllOverlays);
+
+  // ---------------------------------------------------------------------------
+  // Universal Link Click Interception (All File Types: ZIP, EXE, ISO, PDF, etc.)
+  // ---------------------------------------------------------------------------
+  const DOWNLOAD_EXTENSIONS_REGEX = /\.(zip|rar|7z|tar|gz|bz2|xz|iso|img|dmg|pkg|exe|msi|bin|apk|deb|rpm|pdf|djvu|doc|docx|xls|xlsx|ppt|pptx|csv|epub|mobi|mp3|flac|wav|aac|ogg|m4a|wma|mp4|mkv|webm|avi|mov|wmv|flv|torrent)(?:$|[?#])/i;
+
+  document.addEventListener("click", async (e) => {
+    // Only intercept primary mouse button (left-click) without modifier keys
+    if (e.button !== 0 || e.defaultPrevented || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) {
+      return;
+    }
+    const anchor = e.target.closest("a[href]");
+    if (!anchor || !anchor.href) return;
+
+    const href = anchor.href;
+    if (!/^https?:\/\//i.test(href)) return;
+
+    let isDownloadable = false;
+    const hasDownloadAttr = anchor.hasAttribute("download");
+    if (hasDownloadAttr) {
+      isDownloadable = true;
+    } else {
+      try {
+        const u = new URL(href);
+        if (DOWNLOAD_EXTENSIONS_REGEX.test(u.pathname)) {
+          isDownloadable = true;
+        }
+      } catch (_e) {}
+    }
+
+    if (!isDownloadable) return;
+
+    // Check with background worker if CIDM is online and intercept is enabled
+    try {
+      const resp = await chrome.runtime.sendMessage({
+        type: "interceptLinkClick",
+        url: href,
+        downloadAttr: anchor.getAttribute("download") || "",
+        linkText: (anchor.textContent || "").trim().slice(0, 80),
+        pageTitle: document.title || "",
+        referer: window.location.href,
+      });
+      if (resp && resp.intercepted) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    } catch (_err) {
+      // Background worker unreachable or offline; continue standard browser behavior
+    }
+  }, true);
 })();

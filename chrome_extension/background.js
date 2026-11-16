@@ -33,12 +33,12 @@ chrome.runtime.onInstalled.addListener(async () => {
     await chrome.storage.local.set({ interceptEnabled: true });
   }
 
-  // Register context menu
+  // Register context menu for all web links, media, and pages
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
       id: "cidm-download-context",
       title: "Download with CIDM",
-      contexts: ["page", "link", "video"],
+      contexts: ["page", "link", "video", "audio", "image"],
     });
     chrome.contextMenus.create({
       id: "cidm-download-all-links",
@@ -71,7 +71,44 @@ function safeName(title) {
   return (title || "").replace(/[\\/:*?"<>|\u0000-\u001f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 120);
 }
 
+function isGenericFilename(name) {
+  if (!name) return true;
+  const s = String(name).trim().toLowerCase();
+  const base = s.split(".")[0];
+  const ext = s.includes(".") ? s.split(".").pop() : "";
+  if (["download", "file", "view", "uc", "open", "index", "export", "stream", "get", "media"].includes(base)) {
+    return true;
+  }
+  if (!ext) return true;
+  return false;
+}
+
+function extractGoogleDriveTitle(title) {
+  if (!title) return "";
+  const cleaned = title.replace(/\s*-\s*Google\s+(Drive|Docs|Sheets|Slides)\s*$/i, "").trim();
+  return safeName(cleaned);
+}
+
+function normalizeDownloadUrl(url) {
+  if (!url || !/^https?:\/\//i.test(url)) return url;
+  const m1 = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/i);
+  const m2 = !m1 && url.match(/drive\.google\.com\/open\?.*?id=([a-zA-Z0-9_-]+)/i);
+  const m3 = !m1 && !m2 && url.match(/drive\.google\.com\/uc\?.*?id=([a-zA-Z0-9_-]+)/i);
+  const m4 = !m1 && !m2 && !m3 && url.match(/drive\.usercontent\.google\.com\/download\?.*?id=([a-zA-Z0-9_-]+)/i);
+  const match = m1 || m2 || m3 || m4;
+  if (match) {
+    return `https://drive.usercontent.google.com/download?id=${match[1]}&export=download&confirm=t`;
+  }
+  if (url.includes("dropbox.com/") && url.includes("dl=0")) {
+    return url.replace("dl=0", "dl=1");
+  }
+  return url;
+}
+
 async function sendToDesktop(payload) {
+  if (payload && payload.url) {
+    payload.url = normalizeDownloadUrl(payload.url);
+  }
   const res = await fetch(`${BRIDGE}/add-download`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -154,8 +191,10 @@ function classifyStreamUrl(rawUrl) {
 
 function defaultFilename(url, streamType) {
   try {
-    const p = new URL(url).pathname.split("/").filter(Boolean).pop() || "video";
-    const name = decodeURIComponent(p.split("?")[0]);
+    const u = new URL(url);
+    const p = u.pathname.split("/").filter(Boolean).pop() || "";
+    let name = decodeURIComponent(p.split("?")[0]);
+    if (!name) name = "file";
     if (streamType === "hls" && (name.endsWith(".m3u8") || name.endsWith(".m3u"))) {
       return name.replace(/\.(m3u8|m3u)$/i, ".mp4");
     }
@@ -164,7 +203,8 @@ function defaultFilename(url, streamType) {
     }
     return name;
   } catch (_e) {
-    return `stream.${streamType === "hls" || streamType === "dash" ? "mp4" : streamType}`;
+    if (streamType === "hls" || streamType === "dash") return "stream.mp4";
+    return streamType ? `file.${streamType}` : "file";
   }
 }
 
@@ -327,22 +367,38 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
 });
 
 // ---------------------------------------------------------------------------
-// Standard Browser Downloads Interception
+// Standard Browser Downloads Interception (All File Types: ZIP, EXE, ISO, PDF, etc.)
 // ---------------------------------------------------------------------------
-chrome.downloads.onCreated.addListener(async (item) => {
+async function handleBrowserDownloadItem(item, suggest) {
   try {
-    if (handledIds.has(item.id)) return;
-    handledIds.add(item.id);
+    if (handledIds.has(item.id)) {
+      if (suggest) suggest();
+      return;
+    }
 
     const { interceptEnabled } = await chrome.storage.local.get("interceptEnabled");
-    if (interceptEnabled === false) return;
+    if (interceptEnabled === false) {
+      if (suggest) suggest();
+      return;
+    }
 
     const url = item.finalUrl || item.url;
-    if (!url || !/^https?:\/\//i.test(url)) return;
-    if (bypassUrls.delete(item.url) || bypassUrls.delete(url)) return;
-    if (item.state && item.state !== "in_progress") return;
+    if (!url || !/^https?:\/\//i.test(url)) {
+      if (suggest) suggest();
+      return;
+    }
+    if (bypassUrls.delete(item.url) || bypassUrls.delete(url)) {
+      if (suggest) suggest();
+      return;
+    }
 
-    if (!(await isDesktopAppRunning())) return;
+    const running = await isDesktopAppRunning();
+    if (!running) {
+      if (suggest) suggest();
+      return;
+    }
+
+    handledIds.add(item.id);
 
     try { await chrome.downloads.cancel(item.id); } catch (_e) {}
     try { await chrome.downloads.erase({ id: item.id }); } catch (_e) {}
@@ -352,21 +408,62 @@ chrome.downloads.onCreated.addListener(async (item) => {
       cookies = cookieHeader(await chrome.cookies.getAll({ url }));
     } catch (_e) {}
 
+    let cleanFilename = "";
+    if (item.filename) {
+      cleanFilename = item.filename.split(/[/\\]/).pop();
+    }
+    if (isGenericFilename(cleanFilename)) {
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tab && tab.title) {
+          const gdriveTitle = extractGoogleDriveTitle(tab.title);
+          if (gdriveTitle && !isGenericFilename(gdriveTitle)) {
+            cleanFilename = gdriveTitle;
+          }
+        }
+      } catch (_e) {}
+    }
+    if (isGenericFilename(cleanFilename)) {
+      cleanFilename = "";
+    }
+
     const payload = {
       url,
-      filename: item.filename ? item.filename.split(/[/\\]/).pop() : "",
+      filename: cleanFilename,
       cookies,
       user_agent: navigator.userAgent,
       referer: item.referrer || "",
       origin: "",
       stream_type: "",
+      file_size: item.fileSize || item.totalBytes || 0,
+      mime: item.mime || "",
     };
 
     await sendToDesktop(payload);
   } catch (err) {
     console.warn("Download interception error:", err);
+    if (suggest) {
+      try { suggest(); } catch (_e) {}
+    }
   }
-});
+}
+
+// onDeterminingFilename provides the real resolved filename and headers
+if (chrome.downloads && chrome.downloads.onDeterminingFilename) {
+  chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
+    handleBrowserDownloadItem(item, suggest);
+    return true; // Keep async suggest channel open
+  });
+}
+
+// Fallback for browsers or events where onDeterminingFilename is unavailable
+if (chrome.downloads && chrome.downloads.onCreated) {
+  chrome.downloads.onCreated.addListener((item) => {
+    if (!chrome.downloads.onDeterminingFilename) {
+      handleBrowserDownloadItem(item, null);
+    }
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Context Menu: "Download with CIDM" & "Download all links with CIDM"
@@ -435,7 +532,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
   if (info.menuItemId !== "cidm-download-context" && info.menuItemId !== "pyidm-download-context") return;
 
-  const targetUrl = info.srcUrl || info.linkUrl || info.pageUrl;
+  const targetUrl = info.linkUrl || info.srcUrl || info.pageUrl;
   if (!targetUrl || !/^https?:\/\//i.test(targetUrl)) return;
 
   if (!(await isDesktopAppRunning())) {
@@ -457,9 +554,25 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
   const subtitles = tab ? getSubtitlesForTab(tab.id, info.frameId) : [];
 
+  // Determine true target filename: prefer link/media pathname before page title
+  let filename = "";
+  if (info.linkUrl || info.srcUrl) {
+    const rawTarget = info.linkUrl || info.srcUrl;
+    filename = defaultFilename(rawTarget, classifyStreamUrl(rawTarget));
+  }
+  if ((!filename || isGenericFilename(filename)) && tab && tab.title) {
+    filename = extractGoogleDriveTitle(tab.title) || safeName(tab.title);
+  }
+  if (!filename) {
+    filename = defaultFilename(targetUrl, classifyStreamUrl(targetUrl));
+  }
+  if (isGenericFilename(filename)) {
+    filename = "";
+  }
+
   const payload = {
     url: targetUrl,
-    filename: safeName(tab ? tab.title : "") || defaultFilename(targetUrl, "mp4"),
+    filename,
     cookies,
     user_agent: navigator.userAgent,
     referer: (tab && tab.url) || "",
@@ -739,6 +852,99 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse({ ok: false, error: "NO_STREAM" });
       } catch (err) {
         sendResponse({ ok: false, error: "OFFLINE" });
+      }
+    })();
+    return true;
+  }
+
+  // Handle direct downloadable link clicks from in-page content script
+  if (msg.type === "interceptLinkClick") {
+    (async () => {
+      try {
+        const { interceptEnabled } = await chrome.storage.local.get("interceptEnabled");
+        if (interceptEnabled === false) {
+          sendResponse({ intercepted: false });
+          return;
+        }
+
+        const running = await isDesktopAppRunning();
+        if (!running) {
+          sendResponse({ intercepted: false });
+          return;
+        }
+
+        const url = (msg.url || "").trim();
+        if (!/^https?:\/\//i.test(url)) {
+          sendResponse({ intercepted: false });
+          return;
+        }
+
+        let cookies = "";
+        try { cookies = cookieHeader(await chrome.cookies.getAll({ url })); } catch (_e) {}
+
+        let origin = "";
+        try { origin = new URL(url).origin; } catch (_e) {}
+
+        let filename = msg.downloadAttr || "";
+        if (!filename) {
+          filename = defaultFilename(url, classifyStreamUrl(url));
+        }
+        if (!filename && msg.pageTitle) {
+          filename = safeName(msg.pageTitle);
+        }
+
+        await sendToDesktop({
+          url,
+          filename,
+          cookies,
+          user_agent: navigator.userAgent,
+          referer: msg.referer || (sender.tab && sender.tab.url) || "",
+          origin,
+          stream_type: classifyStreamUrl(url) || "",
+        });
+
+        sendResponse({ intercepted: true });
+      } catch (err) {
+        console.warn("Failed to intercept link click:", err);
+        sendResponse({ intercepted: false });
+      }
+    })();
+    return true;
+  }
+
+  // Handle Quick Download from popup
+  if (msg.type === "quickDownload") {
+    (async () => {
+      try {
+        if (!(await isDesktopAppRunning())) {
+          throw new Error("CIDM desktop app is offline. Please launch CIDM.");
+        }
+        const url = (msg.url || "").trim();
+        if (!/^https?:\/\//i.test(url)) {
+          throw new Error("Invalid URL. Must begin with http:// or https://");
+        }
+
+        let cookies = "";
+        try { cookies = cookieHeader(await chrome.cookies.getAll({ url })); } catch (_e) {}
+
+        let origin = "";
+        try { origin = new URL(url).origin; } catch (_e) {}
+
+        const filename = msg.filename || defaultFilename(url, classifyStreamUrl(url));
+
+        await sendToDesktop({
+          url,
+          filename,
+          cookies,
+          user_agent: navigator.userAgent,
+          referer: msg.referer || url,
+          origin,
+          stream_type: classifyStreamUrl(url) || "",
+        });
+
+        sendResponse({ ok: true });
+      } catch (err) {
+        sendResponse({ ok: false, error: String(err.message || err) });
       }
     })();
     return true;

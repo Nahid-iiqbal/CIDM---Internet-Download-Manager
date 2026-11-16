@@ -9,6 +9,10 @@ Write-Host "=================================================================" -
 Write-Host "                CIDM Release Packager v$Version                  " -ForegroundColor Cyan
 Write-Host "=================================================================" -ForegroundColor Cyan
 
+# Terminate running background CIDM processes locking files in dist/
+Get-Process | Where-Object { $_.ProcessName -like "*cidm*" -or $_.ProcessName -like "*pyidm*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Sleep -Milliseconds 500
+
 # Locate Python environment
 $PythonExe = "python"
 if (Test-Path ".venv\Scripts\python.exe") {
@@ -22,9 +26,9 @@ if (Test-Path ".venv\Scripts\python.exe") {
 $Iscc = Get-Command "iscc" -ErrorAction SilentlyContinue
 if (-not $Iscc) {
     $candidates = @(
+        "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe",
         "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
-        "C:\Program Files\Inno Setup 6\ISCC.exe",
-        "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
+        "C:\Program Files\Inno Setup 6\ISCC.exe"
     )
     foreach ($cand in $candidates) {
         if (Test-Path $cand) {
