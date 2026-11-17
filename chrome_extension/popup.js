@@ -9,6 +9,18 @@ const streamsListEl = document.getElementById("streams-list");
 const streamCountEl = document.getElementById("stream-count");
 const msgEl = document.getElementById("msg");
 
+// Cross-browser session storage wrapper
+const sessionStore = (typeof chrome !== "undefined" && chrome.storage && chrome.storage.session) ? chrome.storage.session : {
+  get: async (keys) => {
+    try {
+      if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+        return (await chrome.storage.local.get(keys)) || {};
+      }
+      return {};
+    } catch (_e) { return {}; }
+  },
+};
+
 let activeTabId = null;
 let lastSignature = "";
 
@@ -121,14 +133,14 @@ async function loadStreams() {
     if (res && res.ok) {
       renderStreams(res.streams || [], res.subtitles || []);
     } else {
-      const storedStreams = await chrome.storage.session.get(`streams:${activeTabId}`);
-      const storedSubs = await chrome.storage.session.get(`subtitles:${activeTabId}`);
+      const storedStreams = await sessionStore.get(`streams:${activeTabId}`);
+      const storedSubs = await sessionStore.get(`subtitles:${activeTabId}`);
       renderStreams(storedStreams[`streams:${activeTabId}`] || [], storedSubs[`subtitles:${activeTabId}`] || []);
     }
   } catch (_e) {
     try {
-      const storedStreams = await chrome.storage.session.get(`streams:${activeTabId}`);
-      const storedSubs = await chrome.storage.session.get(`subtitles:${activeTabId}`);
+      const storedStreams = await sessionStore.get(`streams:${activeTabId}`);
+      const storedSubs = await sessionStore.get(`subtitles:${activeTabId}`);
       renderStreams(storedStreams[`streams:${activeTabId}`] || [], storedSubs[`subtitles:${activeTabId}`] || []);
     } catch (_err) {}
   }

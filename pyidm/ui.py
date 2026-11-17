@@ -1218,74 +1218,138 @@ def create_app_icon() -> QIcon:
 # --------------------------------------------------------------------------- #
 # Browser Integration & Extension Helpers
 # --------------------------------------------------------------------------- #
-def get_extension_source_dir() -> str:
-    """Locate the bundled chrome_extension directory."""
-    base_dir = getattr(
-        sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__))
+def get_extension_source_dir(browser_type: str = "chromium") -> str:
+    """Locate the bundled browser extension directory for chromium or firefox."""
+    is_firefox = "firefox" in browser_type.lower()
+    folder_names = (
+        ["firefox_extension", "extension/firefox", "firefox"]
+        if is_firefox
+        else ["chrome_extension", "extension/chromium", "chromium", "extension"]
     )
-    cand = os.path.join(base_dir, "chrome_extension")
-    if os.path.isdir(cand) and os.path.exists(os.path.join(cand, "manifest.json")):
-        return cand
-    cand = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "chrome_extension"
-    )
-    if os.path.isdir(cand) and os.path.exists(os.path.join(cand, "manifest.json")):
-        return cand
+
+    # Search order 1: Next to running executable (installed / portable dist)
+    exe_dir = os.path.dirname(os.path.abspath(sys.executable))
+    for folder in folder_names:
+        cand = os.path.join(exe_dir, *folder.split("/"))
+        if os.path.isdir(cand) and os.path.exists(os.path.join(cand, "manifest.json")):
+            return os.path.abspath(cand)
+
+    # Search order 2: PyInstaller temp directory (_MEIPASS)
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        for folder in folder_names:
+            cand = os.path.join(meipass, *folder.split("/"))
+            if os.path.isdir(cand) and os.path.exists(os.path.join(cand, "manifest.json")):
+                return os.path.abspath(cand)
+
+    # Search order 3: Relative to source file directory (dev environment or _internal)
+    code_dir = os.path.dirname(os.path.abspath(__file__))
+    for folder in folder_names:
+        cand = os.path.join(code_dir, *folder.split("/"))
+        if os.path.isdir(cand) and os.path.exists(os.path.join(cand, "manifest.json")):
+            return os.path.abspath(cand)
+        cand_parent = os.path.join(code_dir, "..", *folder.split("/"))
+        if os.path.isdir(cand_parent) and os.path.exists(os.path.join(cand_parent, "manifest.json")):
+            return os.path.abspath(cand_parent)
+
     return ""
 
 
-def get_installed_extension_dir() -> str:
+def get_installed_extension_dir(browser_type: str = "chromium") -> str:
     """Persistent destination directory for the CIDM browser extension."""
-    return os.path.join(os.path.expanduser("~"), ".cidm", "extension")
+    sub = "firefox" if "firefox" in browser_type.lower() else "chromium"
+    return os.path.join(os.path.expanduser("~"), ".cidm", "extension", sub)
 
 
-def sync_extension_files() -> str:
+def sync_extension_files(browser_type: str = "all") -> str:
     """Copy or update extension files into ~/.cidm/extension."""
-    src = get_extension_source_dir()
-    dst = get_installed_extension_dir()
-    if not src or not os.path.isdir(src):
-        return dst if os.path.isdir(dst) else ""
-    try:
-        os.makedirs(dst, exist_ok=True)
-        for item in os.listdir(src):
-            s_item = os.path.join(src, item)
-            d_item = os.path.join(dst, item)
-            if os.path.isdir(s_item):
-                shutil.copytree(s_item, d_item, dirs_exist_ok=True)
-            else:
-                shutil.copy2(s_item, d_item)
-        return dst
-    except Exception:
-        return dst if os.path.isdir(dst) else src
+    types_to_sync = (
+        ["chromium", "firefox"]
+        if browser_type == "all"
+        else [browser_type]
+    )
+    ret_dir = ""
+    for b_type in types_to_sync:
+        src = get_extension_source_dir(b_type)
+        dst = get_installed_extension_dir(b_type)
+        if not src or not os.path.isdir(src):
+            if not ret_dir:
+                ret_dir = dst if os.path.isdir(dst) else ""
+            continue
+        try:
+            os.makedirs(dst, exist_ok=True)
+            for item in os.listdir(src):
+                s_item = os.path.join(src, item)
+                d_item = os.path.join(dst, item)
+                if os.path.isdir(s_item):
+                    shutil.copytree(s_item, d_item, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(s_item, d_item)
+
+            # For chromium, also maintain legacy root directory ~/.cidm/extension
+            if "chromium" in b_type.lower() or "chrome" in b_type.lower():
+                legacy_dst = os.path.join(os.path.expanduser("~"), ".cidm", "extension")
+                os.makedirs(legacy_dst, exist_ok=True)
+                for item in os.listdir(src):
+                    s_item = os.path.join(src, item)
+                    d_item = os.path.join(legacy_dst, item)
+                    if os.path.isdir(s_item):
+                        shutil.copytree(s_item, d_item, dirs_exist_ok=True)
+                    else:
+                        shutil.copy2(s_item, d_item)
+
+            if not ret_dir or b_type == browser_type:
+                ret_dir = dst
+        except Exception:
+            if not ret_dir:
+                ret_dir = dst if os.path.isdir(dst) else src
+    return ret_dir or get_installed_extension_dir(browser_type)
 
 
-def register_extension_in_registry(ext_dir: str) -> None:
-    """Register extension in Windows Registry for Chromium-based browsers."""
+def register_extension_in_registry(ext_dir: str, browser_type: str = "chromium") -> None:
+    """Register extension in Windows Registry for Chromium and Firefox browsers."""
     if sys.platform != "win32" or not ext_dir:
         return
     try:
         import winreg
-        targets = [
-            r"Software\Google\Chrome\Extensions\cidm_download_manager",
-            r"Software\Microsoft\Edge\Extensions\cidm_download_manager",
-            r"Software\BraveSoftware\Brave-Browser\Extensions\cidm_download_manager",
-        ]
-        manifest_path = os.path.join(ext_dir, "manifest.json")
-        for subkey in targets:
+        is_firefox = "firefox" in browser_type.lower()
+        if is_firefox:
             try:
-                key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, subkey)
-                winreg.SetValueEx(key, "path", 0, winreg.REG_SZ, manifest_path)
-                winreg.SetValueEx(key, "version", 0, winreg.REG_SZ, "2.1.0")
+                key = winreg.CreateKey(
+                    winreg.HKEY_CURRENT_USER, r"Software\Mozilla\Firefox\Extensions"
+                )
+                winreg.SetValueEx(
+                    key,
+                    "cidm-integration@cidm.github.com",
+                    0,
+                    winreg.REG_SZ,
+                    ext_dir,
+                )
                 winreg.CloseKey(key)
             except Exception:
                 pass
+        else:
+            targets = [
+                r"Software\Google\Chrome\Extensions\cidm_download_manager",
+                r"Software\Microsoft\Edge\Extensions\cidm_download_manager",
+                r"Software\BraveSoftware\Brave-Browser\Extensions\cidm_download_manager",
+            ]
+            manifest_path = os.path.join(ext_dir, "manifest.json")
+            for subkey in targets:
+                try:
+                    key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, subkey)
+                    winreg.SetValueEx(key, "path", 0, winreg.REG_SZ, manifest_path)
+                    winreg.SetValueEx(key, "version", 0, winreg.REG_SZ, "2.1.0")
+                    winreg.CloseKey(key)
+                except Exception:
+                    pass
     except Exception:
         pass
 
 
-def open_extension_folder(ext_dir: str = "") -> None:
+def open_extension_folder(ext_dir: str = "", browser_type: str = "chromium") -> None:
     """Open the extension folder in File Explorer."""
-    path = ext_dir or sync_extension_files() or get_installed_extension_dir()
+    path = ext_dir or sync_extension_files(browser_type) or get_installed_extension_dir(browser_type)
     if not os.path.exists(path):
         try:
             os.makedirs(path, exist_ok=True)
@@ -1304,10 +1368,11 @@ def open_extension_folder(ext_dir: str = "") -> None:
 
 
 def detect_installed_browsers() -> List[Dict[str, str]]:
-    """Detect popular web browsers installed on Windows."""
+    """Detect popular web browsers installed on Windows (Chromium and Firefox)."""
     browsers_spec = [
         {
             "name": "Google Chrome",
+            "type": "chromium",
             "reg": [r"Software\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe"],
             "fs": [
                 r"%ProgramFiles%\Google\Chrome\Application\chrome.exe",
@@ -1317,7 +1382,22 @@ def detect_installed_browsers() -> List[Dict[str, str]]:
             "ext_url": "chrome://extensions",
         },
         {
+            "name": "Mozilla Firefox",
+            "type": "firefox",
+            "reg": [
+                r"Software\Microsoft\Windows\CurrentVersion\App Paths\firefox.exe",
+                r"Software\Mozilla\Mozilla Firefox",
+            ],
+            "fs": [
+                r"%ProgramFiles%\Mozilla Firefox\firefox.exe",
+                r"%ProgramFiles(x86)%\Mozilla Firefox\firefox.exe",
+                r"%LocalAppData%\Mozilla Firefox\firefox.exe",
+            ],
+            "ext_url": "about:debugging#/runtime/this-firefox",
+        },
+        {
             "name": "Microsoft Edge",
+            "type": "chromium",
             "reg": [r"Software\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe"],
             "fs": [
                 r"%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe",
@@ -1327,6 +1407,7 @@ def detect_installed_browsers() -> List[Dict[str, str]]:
         },
         {
             "name": "Brave Browser",
+            "type": "chromium",
             "reg": [r"Software\Microsoft\Windows\CurrentVersion\App Paths\brave.exe"],
             "fs": [
                 r"%ProgramFiles%\BraveSoftware\Brave-Browser\Application\brave.exe",
@@ -1336,6 +1417,7 @@ def detect_installed_browsers() -> List[Dict[str, str]]:
         },
         {
             "name": "Opera",
+            "type": "chromium",
             "reg": [r"Software\Microsoft\Windows\CurrentVersion\App Paths\opera.exe"],
             "fs": [
                 r"%LocalAppData%\Programs\Opera\opera.exe",
@@ -1345,6 +1427,7 @@ def detect_installed_browsers() -> List[Dict[str, str]]:
         },
         {
             "name": "Opera GX",
+            "type": "chromium",
             "reg": [r"Software\Microsoft\Windows\CurrentVersion\App Paths\opera_gx.exe"],
             "fs": [
                 r"%LocalAppData%\Programs\Opera GX\opera.exe",
@@ -1353,6 +1436,7 @@ def detect_installed_browsers() -> List[Dict[str, str]]:
         },
         {
             "name": "Vivaldi",
+            "type": "chromium",
             "reg": [r"Software\Microsoft\Windows\CurrentVersion\App Paths\vivaldi.exe"],
             "fs": [
                 r"%LocalAppData%\Vivaldi\Application\vivaldi.exe",
@@ -1394,6 +1478,7 @@ def detect_installed_browsers() -> List[Dict[str, str]]:
                 if exe_path:
                     detected.append({
                         "name": b["name"],
+                        "type": b.get("type", "chromium"),
                         "exe": exe_path,
                         "ext_url": b["ext_url"],
                     })
@@ -1405,23 +1490,44 @@ def detect_installed_browsers() -> List[Dict[str, str]]:
 
 def launch_browser_for_extension_install(
     browser_exe: str,
-    ext_url: str = "chrome://extensions",
+    ext_url: str = "",
     parent: Optional[QWidget] = None,
     browser_name: str = "Browser",
+    browser_type: str = "chromium",
 ) -> bool:
     """Prepare extension, copy path to clipboard, launch browser, and show instructions dialog."""
-    ext_dir = sync_extension_files()
-    register_extension_in_registry(ext_dir)
+    if (
+        "firefox" in browser_name.lower()
+        or "firefox" in browser_exe.lower()
+        or "floorp" in browser_name.lower()
+        or "zen" in browser_name.lower()
+        or "waterfox" in browser_name.lower()
+    ):
+        browser_type = "firefox"
+
+    is_firefox = browser_type == "firefox"
+    if not ext_url:
+        ext_url = "about:debugging#/runtime/this-firefox" if is_firefox else "chrome://extensions"
+
+    ext_dir = sync_extension_files(browser_type)
+    register_extension_in_registry(ext_dir, browser_type)
+
+    # For Firefox, about:debugging file picker requires selecting manifest.json or an extension file
+    clipboard_text = (
+        os.path.join(ext_dir, "manifest.json")
+        if (is_firefox and os.path.exists(os.path.join(ext_dir, "manifest.json")))
+        else ext_dir
+    )
 
     app = QApplication.instance()
-    if app and ext_dir:
-        app.clipboard().setText(ext_dir)
+    if app and clipboard_text:
+        app.clipboard().setText(clipboard_text)
 
     launched = False
     if browser_exe and os.path.exists(browser_exe):
         try:
             args = [browser_exe]
-            if ext_dir and os.path.isdir(ext_dir):
+            if not is_firefox and ext_dir and os.path.isdir(ext_dir):
                 args.append(f"--load-extension={ext_dir}")
             if ext_url:
                 args.append(ext_url)
@@ -1435,13 +1541,14 @@ def launch_browser_for_extension_install(
         browser_name=browser_name,
         ext_dir=ext_dir,
         launched=launched,
+        browser_type=browser_type,
     )
     dlg.exec()
     return launched
 
 
 class ExtensionInstallGuideDialog(QDialog):
-    """Clean guided 3-step walkthrough for loading unpacked CIDM extension."""
+    """Clean guided 3-step walkthrough for loading unpacked CIDM extension (Chromium or Firefox)."""
 
     def __init__(
         self,
@@ -1449,12 +1556,20 @@ class ExtensionInstallGuideDialog(QDialog):
         browser_name: str = "Browser",
         ext_dir: str = "",
         launched: bool = True,
+        browser_type: str = "chromium",
     ):
         super().__init__(parent)
         self.setWindowTitle(f"Install CIDM Extension — {browser_name}")
-        self.resize(520, 360)
+        self.resize(540, 390)
         self.setModal(True)
-        self.ext_dir = ext_dir or get_installed_extension_dir()
+        self.browser_type = browser_type
+        self.is_firefox = "firefox" in browser_type.lower()
+        self.ext_dir = ext_dir or get_installed_extension_dir(browser_type)
+        self.target_path = (
+            os.path.join(self.ext_dir, "manifest.json")
+            if self.is_firefox
+            else self.ext_dir
+        )
 
         lay = QVBoxLayout(self)
         lay.setContentsMargins(18, 18, 18, 18)
@@ -1485,26 +1600,55 @@ class ExtensionInstallGuideDialog(QDialog):
         steps_lay = QVBoxLayout(steps_group)
         steps_lay.setSpacing(9)
 
-        s1 = QLabel("<b>Step 1:</b> In the browser Extensions tab, turn <b>ON</b> the <b>'Developer mode'</b> switch (usually at the top-right corner).")
-        s1.setStyleSheet("font-size: 12px; line-height: 1.4;")
-        s1.setWordWrap(True)
-        steps_lay.addWidget(s1)
+        if self.is_firefox:
+            s1 = QLabel(
+                "<b>Step 1:</b> Firefox will open <b>about:debugging#/runtime/this-firefox</b> "
+                "(or type that address into Firefox's URL bar)."
+            )
+            s1.setStyleSheet("font-size: 12px; line-height: 1.4;")
+            s1.setWordWrap(True)
+            steps_lay.addWidget(s1)
 
-        s2 = QLabel("<b>Step 2:</b> Click the <b>'Load unpacked'</b> button (top-left).")
-        s2.setStyleSheet("font-size: 12px; line-height: 1.4;")
-        s2.setWordWrap(True)
-        steps_lay.addWidget(s2)
+            s2 = QLabel(
+                "<b>Step 2:</b> Under <b>Temporary Extensions</b>, click the "
+                "<b>'Load Temporary Add-on...'</b> button."
+            )
+            s2.setStyleSheet("font-size: 12px; line-height: 1.4;")
+            s2.setWordWrap(True)
+            steps_lay.addWidget(s2)
 
-        s3 = QLabel("<b>Step 3:</b> The extension path is <b>already copied to your clipboard</b>! Press <b>Ctrl+V</b> into the folder path box and click <b>'Select Folder'</b>.")
-        s3.setStyleSheet("font-size: 12px; line-height: 1.4; color: #57ab5a;")
-        s3.setWordWrap(True)
-        steps_lay.addWidget(s3)
+            s3 = QLabel(
+                "<b>Step 3:</b> The path to <b>manifest.json</b> is <b>already copied to your clipboard</b>! "
+                "Press <b>Ctrl+V</b> into the File Name box and click <b>'Open'</b>."
+            )
+            s3.setStyleSheet("font-size: 12px; line-height: 1.4; color: #57ab5a;")
+            s3.setWordWrap(True)
+            steps_lay.addWidget(s3)
+        else:
+            s1 = QLabel(
+                "<b>Step 1:</b> In the browser Extensions tab, turn <b>ON</b> the <b>'Developer mode'</b> switch (usually at top-right corner)."
+            )
+            s1.setStyleSheet("font-size: 12px; line-height: 1.4;")
+            s1.setWordWrap(True)
+            steps_lay.addWidget(s1)
+
+            s2 = QLabel("<b>Step 2:</b> Click the <b>'Load unpacked'</b> button (top-left).")
+            s2.setStyleSheet("font-size: 12px; line-height: 1.4;")
+            s2.setWordWrap(True)
+            steps_lay.addWidget(s2)
+
+            s3 = QLabel(
+                "<b>Step 3:</b> The extension folder path is <b>already copied to your clipboard</b>! Press <b>Ctrl+V</b> into the folder path box and click <b>'Select Folder'</b>."
+            )
+            s3.setStyleSheet("font-size: 12px; line-height: 1.4; color: #57ab5a;")
+            s3.setWordWrap(True)
+            steps_lay.addWidget(s3)
 
         lay.addWidget(steps_group)
 
         path_box = QHBoxLayout()
         path_box.setSpacing(8)
-        self.path_edit = QLineEdit(self.ext_dir)
+        self.path_edit = QLineEdit(self.target_path)
         self.path_edit.setReadOnly(True)
         self.path_edit.setStyleSheet("font-family: monospace; font-size: 11px;")
 
@@ -1514,7 +1658,7 @@ class ExtensionInstallGuideDialog(QDialog):
 
         btn_open = QPushButton("Open Folder")
         btn_open.setAutoDefault(False)
-        btn_open.clicked.connect(lambda: open_extension_folder(self.ext_dir))
+        btn_open.clicked.connect(lambda: open_extension_folder(self.ext_dir, self.browser_type))
 
         path_box.addWidget(self.path_edit, 1)
         path_box.addWidget(btn_copy)
@@ -1539,7 +1683,7 @@ class ExtensionInstallGuideDialog(QDialog):
     def _copy_path(self):
         app = QApplication.instance()
         if app:
-            app.clipboard().setText(self.ext_dir)
+            app.clipboard().setText(self.target_path)
         self.lbl_status.setText("Path copied to clipboard again!")
 
 
@@ -1551,7 +1695,7 @@ class FirstRunExtensionDialog(QDialog):
         self.setWindowTitle("Welcome to CIDM — Browser Extension Setup")
         self.resize(560, 430)
         self.setModal(True)
-        self.ext_dir = sync_extension_files()
+        self.ext_dir = sync_extension_files("all")
 
         lay = QVBoxLayout(self)
         lay.setContentsMargins(20, 20, 20, 20)
@@ -1651,9 +1795,10 @@ class FirstRunExtensionDialog(QDialog):
     def _install_browser(self, b_info: Dict[str, str]):
         launch_browser_for_extension_install(
             browser_exe=b_info["exe"],
-            ext_url=b_info.get("ext_url", "chrome://extensions"),
+            ext_url=b_info.get("ext_url", ""),
             parent=self,
             browser_name=b_info["name"],
+            browser_type=b_info.get("type", "chromium"),
         )
 
     def _browse_custom_browser(self):
@@ -1664,11 +1809,18 @@ class FirstRunExtensionDialog(QDialog):
             "Executable Files (*.exe);;All Files (*)",
         )
         if exe:
+            b_name = os.path.splitext(os.path.basename(exe))[0].capitalize()
+            b_type = (
+                "firefox"
+                if any(x in b_name.lower() for x in ("firefox", "floorp", "zen", "waterfox"))
+                else "chromium"
+            )
             launch_browser_for_extension_install(
                 browser_exe=exe,
-                ext_url="chrome://extensions",
+                ext_url="",
                 parent=self,
-                browser_name=os.path.basename(exe),
+                browser_name=b_name,
+                browser_type=b_type,
             )
 
 
@@ -1860,40 +2012,67 @@ class SettingsDialog(QDialog):
         lay.setSpacing(14)
 
         # 1. Extension Status & Info
-        gb_ext = QGroupBox("CIDM Browser Extension (Manifest V3)")
+        gb_ext = QGroupBox("CIDM Browser Extension (Chromium & Firefox)")
         gb_ext_lay = QVBoxLayout(gb_ext)
         gb_ext_lay.setSpacing(8)
 
         lbl_desc = QLabel(
             "The CIDM extension integrates with your web browser to capture file downloads "
-            "and detect high-speed video streams (HLS, DASH, MP4) directly."
+            "and detect high-speed video streams (YouTube, HLS, DASH, MP4) directly."
         )
         lbl_desc.setStyleSheet("color: #9aa0aa; font-size: 12px; line-height: 1.4;")
         lbl_desc.setWordWrap(True)
         gb_ext_lay.addWidget(lbl_desc)
 
-        ext_dir = sync_extension_files() or get_installed_extension_dir()
+        chr_dir = sync_extension_files("chromium")
+        fox_dir = sync_extension_files("firefox")
+        fox_manifest = os.path.join(fox_dir, "manifest.json")
 
-        loc_row = QHBoxLayout()
-        loc_row.setSpacing(8)
-        lbl_loc = QLabel("Location:")
-        self.ext_dir_edit = QLineEdit(ext_dir)
+        # Chromium row
+        chr_row = QHBoxLayout()
+        chr_row.setSpacing(8)
+        lbl_chr = QLabel("Chrome/Chromium:")
+        lbl_chr.setFixedWidth(120)
+        self.ext_dir_edit = QLineEdit(chr_dir)
         self.ext_dir_edit.setReadOnly(True)
         self.ext_dir_edit.setStyleSheet("font-family: monospace; font-size: 11px;")
 
-        btn_copy = QPushButton("Copy Path")
-        btn_copy.setAutoDefault(False)
-        btn_copy.clicked.connect(self._copy_ext_path)
+        btn_copy_chr = QPushButton("Copy Path")
+        btn_copy_chr.setAutoDefault(False)
+        btn_copy_chr.clicked.connect(lambda: self._copy_ext_path_text(chr_dir, "Chromium folder"))
 
-        btn_folder = QPushButton("Open Folder")
-        btn_folder.setAutoDefault(False)
-        btn_folder.clicked.connect(lambda: open_extension_folder(self.ext_dir_edit.text()))
+        btn_folder_chr = QPushButton("Open Folder")
+        btn_folder_chr.setAutoDefault(False)
+        btn_folder_chr.clicked.connect(lambda: open_extension_folder(chr_dir, "chromium"))
 
-        loc_row.addWidget(lbl_loc)
-        loc_row.addWidget(self.ext_dir_edit, 1)
-        loc_row.addWidget(btn_copy)
-        loc_row.addWidget(btn_folder)
-        gb_ext_lay.addLayout(loc_row)
+        chr_row.addWidget(lbl_chr)
+        chr_row.addWidget(self.ext_dir_edit, 1)
+        chr_row.addWidget(btn_copy_chr)
+        chr_row.addWidget(btn_folder_chr)
+        gb_ext_lay.addLayout(chr_row)
+
+        # Firefox row
+        fox_row = QHBoxLayout()
+        fox_row.setSpacing(8)
+        lbl_fox = QLabel("Mozilla Firefox:")
+        lbl_fox.setFixedWidth(120)
+        self.ext_fox_edit = QLineEdit(fox_manifest)
+        self.ext_fox_edit.setReadOnly(True)
+        self.ext_fox_edit.setStyleSheet("font-family: monospace; font-size: 11px;")
+
+        btn_copy_fox = QPushButton("Copy Path")
+        btn_copy_fox.setAutoDefault(False)
+        btn_copy_fox.clicked.connect(lambda: self._copy_ext_path_text(fox_manifest, "Firefox manifest"))
+
+        btn_folder_fox = QPushButton("Open Folder")
+        btn_folder_fox.setAutoDefault(False)
+        btn_folder_fox.clicked.connect(lambda: open_extension_folder(fox_dir, "firefox"))
+
+        fox_row.addWidget(lbl_fox)
+        fox_row.addWidget(self.ext_fox_edit, 1)
+        fox_row.addWidget(btn_copy_fox)
+        fox_row.addWidget(btn_folder_fox)
+        gb_ext_lay.addLayout(fox_row)
 
         lay.addWidget(gb_ext)
 
@@ -1918,9 +2097,10 @@ class SettingsDialog(QDialog):
                 btn_add_b.clicked.connect(
                     lambda _chk=False, b_info=b: launch_browser_for_extension_install(
                         browser_exe=b_info["exe"],
-                        ext_url=b_info.get("ext_url", "chrome://extensions"),
+                        ext_url=b_info.get("ext_url", ""),
                         parent=self,
                         browser_name=b_info["name"],
+                        browser_type=b_info.get("type", "chromium"),
                     )
                 )
 
@@ -1976,16 +2156,19 @@ class SettingsDialog(QDialog):
         scroll.setWidget(w)
         self.tabs.addTab(scroll, "Browser Integration")
 
-    def _copy_ext_path(self):
+    def _copy_ext_path_text(self, text: str, label: str):
         app = QApplication.instance()
         if app:
-            app.clipboard().setText(self.ext_dir_edit.text())
+            app.clipboard().setText(text)
         QMessageBox.information(
             self,
             "Path Copied",
-            "CIDM extension folder path copied to clipboard!\n\n"
-            "Paste this path (Ctrl+V) when clicking 'Load unpacked' in your browser.",
+            f"CIDM {label} path copied to clipboard:\n\n{text}\n\n"
+            "Paste this path (Ctrl+V) when loading the extension in your browser.",
         )
+
+    def _copy_ext_path(self):
+        self._copy_ext_path_text(self.ext_dir_edit.text(), "Chromium folder")
 
     def _browse_custom_browser(self):
         start_dir = (
@@ -2012,12 +2195,18 @@ class SettingsDialog(QDialog):
             )
             return
         b_name = os.path.splitext(os.path.basename(exe))[0].capitalize()
+        b_type = (
+            "firefox"
+            if any(x in b_name.lower() for x in ("firefox", "floorp", "zen", "waterfox"))
+            else "chromium"
+        )
         self.settings["custom_browser_path"] = exe
         launch_browser_for_extension_install(
             browser_exe=exe,
-            ext_url="chrome://extensions",
+            ext_url="",
             parent=self,
             browser_name=b_name,
+            browser_type=b_type,
         )
 
     def _build_network_tab(self):
@@ -4587,6 +4776,12 @@ class MainWindow(QMainWindow):
         self.timer.timeout.connect(self.refresh)
         self.timer.start()
 
+        # Ensure extension files are up to date on startup
+        try:
+            sync_extension_files("all")
+        except Exception:
+            pass
+
         # First-run browser extension onboarding
         if not self.app_settings.get("extension_installed_prompt_shown", False):
             QTimer.singleShot(750, self._check_first_run_extension)
@@ -5273,14 +5468,14 @@ class MainWindow(QMainWindow):
     def _check_first_run_extension(self):
         if self._is_quitting:
             return
-        sync_extension_files()
+        sync_extension_files("all")
         dlg = FirstRunExtensionDialog(self)
         dlg.exec()
         self.app_settings["extension_installed_prompt_shown"] = True
         save_settings(self.app_settings)
 
     def open_extension_setup(self):
-        sync_extension_files()
+        sync_extension_files("all")
         dlg = FirstRunExtensionDialog(self)
         dlg.exec()
         self.app_settings["extension_installed_prompt_shown"] = True

@@ -91,7 +91,28 @@ if (Test-Path $ExtDir) {
     Write-Host "[!] Warning: Directory $ExtDir not found. Skipping extension zip." -ForegroundColor Yellow
 }
 
-# 4. Summary Table of Artifacts
+# 4. Package Firefox Extension XPI and Zip from firefox_extension\*
+$FirefoxExtDir = Join-Path $PSScriptRoot "firefox_extension"
+$FirefoxXpi = Join-Path $OutputDir "CIDM_Firefox_Extension_v$Version.xpi"
+$FirefoxZip = Join-Path $OutputDir "CIDM_Firefox_Extension_v$Version.zip"
+
+if (Test-Path $FirefoxExtDir) {
+    Write-Host "[*] Creating Firefox Extension Package: $FirefoxZip" -ForegroundColor Cyan
+    if (Test-Path $FirefoxZip) {
+        Remove-Item $FirefoxZip -Force
+    }
+    Compress-Archive -Path "$FirefoxExtDir\*" -DestinationPath $FirefoxZip -Force
+
+    if (Test-Path $FirefoxXpi) {
+        Remove-Item $FirefoxXpi -Force
+    }
+    Copy-Item -Path $FirefoxZip -Destination $FirefoxXpi -Force
+    Write-Host "[+] Firefox Extension XPI & Zip created successfully." -ForegroundColor Green
+} else {
+    Write-Host "[!] Warning: Directory $FirefoxExtDir not found. Skipping firefox extension packaging." -ForegroundColor Yellow
+}
+
+# 5. Summary Table of Artifacts
 Write-Host "`n=================================================================" -ForegroundColor Cyan
 Write-Host "                  Release Artifacts Summary                      " -ForegroundColor Cyan
 Write-Host "=================================================================" -ForegroundColor Cyan

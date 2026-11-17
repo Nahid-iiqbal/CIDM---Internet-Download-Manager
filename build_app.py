@@ -271,6 +271,16 @@ def build(
         cmd.append(f"--add-data={str(ico_path)}{sep}assets")
         cmd.append(f"--add-data={str(ico_path)}{sep}.")
 
+    chrome_ext_dir = base_dir / "chrome_extension"
+    if chrome_ext_dir.exists():
+        cmd.append(f"--add-data={str(chrome_ext_dir)}{sep}chrome_extension")
+        cmd.append(f"--add-data={str(chrome_ext_dir)}{sep}extension{os.sep}chromium")
+
+    firefox_ext_dir = base_dir / "firefox_extension"
+    if firefox_ext_dir.exists():
+        cmd.append(f"--add-data={str(firefox_ext_dir)}{sep}firefox_extension")
+        cmd.append(f"--add-data={str(firefox_ext_dir)}{sep}extension{os.sep}firefox")
+
     # Add bundled ffmpeg binary directly to output root
     if ffmpeg_path and ffmpeg_path.exists():
         cmd.append(f"--add-binary={str(ffmpeg_path)}{sep}.")
@@ -301,6 +311,19 @@ def build(
         return ret.returncode
 
     dist_dir = base_dir / "dist" / "CIDM" if onedir else base_dir / "dist"
+
+    if onedir and dist_dir.exists():
+        print("[*] Copying browser extension packages to distribution directory...")
+        if chrome_ext_dir.exists():
+            shutil.copytree(chrome_ext_dir, dist_dir / "extension" / "chromium", dirs_exist_ok=True)
+            shutil.copytree(chrome_ext_dir, dist_dir / "extension", dirs_exist_ok=True)
+            shutil.copytree(chrome_ext_dir, dist_dir / "chrome_extension", dirs_exist_ok=True)
+            print("    Copied Chromium extension -> dist/CIDM/extension/chromium and dist/CIDM/chrome_extension")
+        if firefox_ext_dir.exists():
+            shutil.copytree(firefox_ext_dir, dist_dir / "extension" / "firefox", dirs_exist_ok=True)
+            shutil.copytree(firefox_ext_dir, dist_dir / "firefox_extension", dirs_exist_ok=True)
+            print("    Copied Firefox extension -> dist/CIDM/extension/firefox and dist/CIDM/firefox_extension")
+
     print("\n" + "=" * 65)
     print("[+] PyInstaller build completed successfully:")
     print(f"    Directory: {dist_dir}")

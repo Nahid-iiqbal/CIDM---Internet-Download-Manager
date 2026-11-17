@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CIDM</title>
+  <style>
+    :root { color-scheme: dark; }
+    body {
+      margin: 0; width: 360px; padding: 14px; box-sizing: border-box;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif; font-size: 13px;
+      background: #171923; color: #e6e8ee;
+    }
+    .header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #282c3c;
+    }
+    .title-row { display: flex; align-items: center; gap: 8px; }
+    .title-row h1 { font-size: 15px; font-weight: 700; margin: 0; color: #f8fafc; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px;
+      border-radius: 999px; font-weight: 600; font-size: 11px;
+    }
+    .badge::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+    .badge.on  { background: rgba(34,197,94,.15);  color: #4ade80; }
+    .badge.off { background: rgba(239,68,68,.15);  color: #f87171; }
+    .badge.wait { background: rgba(148,163,184,.15); color: #94a3b8; }
+
+    .card {
+      background: #202332; border: 1px solid #2d3245; border-radius: 8px;
+      padding: 10px 12px; margin-bottom: 10px;
+    }
+    .row {
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .switch { position: relative; width: 40px; height: 20px; flex: none; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; inset: 0; background: #373e55; border-radius: 20px;
+      cursor: pointer; transition: background .2s;
+    }
+    .slider::before {
+      content: ""; position: absolute; height: 14px; width: 14px; left: 3px; top: 3px;
+      background: #fff; border-radius: 50%; transition: transform .2s;
+    }
+    input:checked + .slider { background: #3b82f6; }
+    input:checked + .slider::before { transform: translateX(20px); }
+
+    .quick-box { display: flex; gap: 6px; margin-top: 8px; }
+    .quick-input {
+      flex: 1; min-width: 0; background: #13151f; border: 1px solid #32374b;
+      border-radius: 6px; color: #f1f5f9; padding: 7px 10px; font-size: 12px;
+      font-family: inherit; outline: none; transition: border-color .15s;
+    }
+    .quick-input:focus { border-color: #3b82f6; }
+    .quick-input::placeholder { color: #64748b; }
+    .quick-btn {
+      flex: none; background: #2563eb; color: #fff; border: 0; border-radius: 6px;
+      padding: 7px 12px; font-size: 12px; font-weight: 600; cursor: pointer;
+      transition: background .15s;
+    }
+    .quick-btn:hover { background: #3b82f6; }
+    .quick-btn:disabled { background: #373e55; cursor: not-allowed; }
+
+    .primary-btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;
+      background: #1e293b; color: #cbd5e1; border: 1px solid #334155; border-radius: 8px;
+      padding: 8px 12px; font-size: 12px; font-weight: 600; cursor: pointer;
+      transition: background .15s, color .15s, border-color .15s; margin-top: 6px;
+    }
+    .primary-btn:hover { background: #2d3748; color: #f8fafc; border-color: #4b5563; }
+    .primary-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .primary-btn.success { background: #15803d; color: #fff; border-color: #15803d; }
+
+    .section-title {
+      font-size: 11px; margin: 12px 0 6px; color: #8a94a6; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .05em; display: flex; align-items: center; justify-content: space-between;
+    }
+    .section-title span.count {
+      font-size: 10px; background: #2d3245; color: #cbd5e1; padding: 1px 6px; border-radius: 10px;
+    }
+    #streams-list {
+      display: flex; flex-direction: column; gap: 6px; max-height: 200px;
+      overflow-y: auto; margin-bottom: 8px;
+    }
+    .item {
+      display: flex; align-items: center; gap: 8px; padding: 7px 10px;
+      background: #202332; border: 1px solid #2d3245; border-radius: 6px;
+    }
+    .tag {
+      flex: none; font-size: 9px; font-weight: 800; padding: 2px 5px;
+      border-radius: 4px; color: #fff; text-transform: uppercase;
+    }
+    .tag.hls { background: #9333ea; }
+    .tag.dash { background: #d97706; }
+    .tag.mp4 { background: #2563eb; }
+    .tag.webm { background: #059669; }
+    .tag.file { background: #475569; }
+
+    .meta { flex: 1; min-width: 0; }
+    .meta .name {
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      font-size: 12px; font-weight: 500; color: #f1f5f9;
+    }
+    .meta .hint-text {
+      font-size: 11px; color: #8a94a6; white-space: nowrap; overflow: hidden;
+      text-overflow: ellipsis; margin-top: 1px;
+    }
+    button.dl-btn {
+      flex: none; background: #282f44; color: #f1f5f9; border: 1px solid #3e4866;
+      border-radius: 5px; padding: 4px 10px; font-size: 11px; font-weight: 600;
+      cursor: pointer; transition: background .15s, border-color .15s;
+    }
+    button.dl-btn:hover { background: #2563eb; border-color: #2563eb; }
+    button.dl-btn:disabled { background: #1c1f2e; color: #525a75; border-color: transparent; cursor: default; }
+    button.dl-btn.sent { background: #16a34a; border-color: #16a34a; color: #fff; }
+    .empty { font-size: 11px; color: #8a94a6; line-height: 1.4; padding: 6px 2px; }
+    #msg { min-height: 15px; font-size: 11px; color: #f87171; margin-top: 4px; }
+    .footer {
+      margin-top: 10px; padding-top: 8px; border-top: 1px solid #232738;
+      font-size: 10px; color: #64748b; line-height: 1.4; text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="title-row">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      <h1>CIDM Integration</h1>
+    </div>
+    <span id="status" class="badge wait">Checking...</span>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <span style="font-weight: 500; font-size: 12px;">Intercept All Browser Downloads</span>
+      <label class="switch">
+        <input type="checkbox" id="toggle">
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom: 12px;">
+    <div style="font-size: 11px; font-weight: 600; color: #94a3b8; margin-bottom: 4px;">Quick Download Any URL</div>
+    <div class="quick-box">
+      <input type="text" id="quick-url" class="quick-input" placeholder="Paste link (ZIP, EXE, ISO, PDF, Video, Media)...">
+      <button id="quick-btn" class="quick-btn">Download</button>
+    </div>
+    <button id="download-tab-btn" class="primary-btn">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      Download Current Webpage / Media
+    </button>
+  </div>
+
+  <div class="section-title">
+    <span>Detected Media & Video Streams</span>
+    <span id="stream-count" class="count">0</span>
+  </div>
+  <div id="streams-list"></div>
+  <div id="msg"></div>
+
+  <div class="footer">
+    Accelerates all file types: ZIP, RAR, 7Z, ISO, EXE, MSI, PDF, Docs, Video & Audio.
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

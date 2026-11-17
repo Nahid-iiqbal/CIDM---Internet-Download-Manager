@@ -8,8 +8,34 @@ const detectedStreamsByTab = new Map();
 const detectedSubtitlesByTab = new Map();
 const MAX_PER_TAB = 30;
 
+// Cross-browser session storage wrapper (Chrome & Firefox)
+const sessionStore = (typeof chrome !== "undefined" && chrome.storage && chrome.storage.session) ? chrome.storage.session : {
+  get: async (keys) => {
+    try {
+      if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+        return (await chrome.storage.local.get(keys)) || {};
+      }
+      return {};
+    } catch (_e) { return {}; }
+  },
+  set: async (items) => {
+    try {
+      if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+        await chrome.storage.local.set(items);
+      }
+    } catch (_e) {}
+  },
+  remove: async (keys) => {
+    try {
+      if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+        await chrome.storage.local.remove(keys);
+      }
+    } catch (_e) {}
+  },
+};
+
 // Initialize session state on worker startup
-chrome.storage.session.get(null).then((items) => {
+sessionStore.get(null).then((items) => {
   if (items) {
     for (const [k, v] of Object.entries(items)) {
       if (k.startsWith("streams:") && Array.isArray(v)) {
@@ -270,7 +296,7 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
         });
         while (subList.length > MAX_PER_TAB) subList.shift();
         detectedSubtitlesByTab.set(tabId, subList);
-        chrome.storage.session.set({ [`subtitles:${tabId}`]: subList }).catch(() => {});
+        sessionStore.set({ [`subtitles:${tabId}`]: subList }).catch(() => {});
       }
       return;
     }
@@ -329,7 +355,7 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
     detectedStreamsByTab.set(tabId, list);
 
     try {
-      await chrome.storage.session.set({ [`streams:${tabId}`]: list });
+      await sessionStore.set({ [`streams:${tabId}`]: list });
     } catch (e) {
       console.warn("Storage session write error:", e);
     }
@@ -345,7 +371,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   if (changeInfo.status === "loading" && changeInfo.url) {
     detectedStreamsByTab.delete(tabId);
     detectedSubtitlesByTab.delete(tabId);
-    chrome.storage.session.remove([`streams:${tabId}`, `subtitles:${tabId}`]);
+    sessionStore.remove([`streams:${tabId}`, `subtitles:${tabId}`]);
     chrome.action.setBadgeText({ tabId, text: "" });
   }
 });
@@ -353,7 +379,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
 chrome.tabs.onRemoved.addListener((tabId) => {
   detectedStreamsByTab.delete(tabId);
   detectedSubtitlesByTab.delete(tabId);
-  chrome.storage.session.remove([`streams:${tabId}`, `subtitles:${tabId}`]);
+  sessionStore.remove([`streams:${tabId}`, `subtitles:${tabId}`]);
 });
 
 chrome.tabs.onActivated.addListener(({ tabId }) => {
@@ -600,7 +626,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       const tabId = msg.tabId;
       let list = detectedStreamsByTab.get(tabId);
       if (!list) {
-        const stored = await chrome.storage.session.get(`streams:${tabId}`);
+        const stored = await sessionStore.get(`streams:${tabId}`);
         list = stored[`streams:${tabId}`] || [];
         detectedStreamsByTab.set(tabId, list);
       }
@@ -631,7 +657,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       const tabId = msg.tabId;
       let list = detectedSubtitlesByTab.get(tabId);
       if (!list) {
-        const stored = await chrome.storage.session.get(`subtitles:${tabId}`);
+        const stored = await sessionStore.get(`subtitles:${tabId}`);
         list = stored[`subtitles:${tabId}`] || [];
         detectedSubtitlesByTab.set(tabId, list);
       }
@@ -770,7 +796,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
         if (list.length === 0 && tabId !== null) {
           try {
-            const stored = await chrome.storage.session.get(`streams:${tabId}`);
+            const stored = await sessionStore.get(`streams:${tabId}`);
             list = stored[`streams:${tabId}`] || [];
             if (list.length > 0) {
               detectedStreamsByTab.set(tabId, list);

@@ -43,8 +43,8 @@
 - **Batch Sniffer:** Probe websites for all downloadable media assets with multi-resolution selector (4K, 1080p, 720p, audio-only).
 
 ### 🧩 Browser Extension & 1-Click Integration
-- **Manifest V3 Extension:** Full integration with Google Chrome, Microsoft Edge, Brave Browser, Opera, and custom Chromium browsers.
-- **First-Run Automatic Onboarding:** Detects installed browsers on launch, prepares the extension in `~/.cidm/extension/`, and provides a 1-click activation walkthrough.
+- **Manifest V3 Extensions:** Full integration with Chromium (Google Chrome, Microsoft Edge, Brave Browser, Opera, Vivaldi) and Mozilla Firefox (Firefox, Floorp, Zen, Waterfox).
+- **First-Run Automatic Onboarding:** Detects installed Chromium and Firefox browsers on launch, prepares the extension bundles in `~/.cidm/extension/`, and provides a 1-click activation walkthrough.
 - **Manual Browser Selector:** Settings tab to install the extension into any custom browser executable (`.exe`).
 - **Download Interception:** Seamlessly passes browser download requests to CIDM via local HTTP bridge (`127.0.0.1:9632`).
 
@@ -62,10 +62,16 @@
 ```
 idm2/
 ├── assets/                  # Icons and branding assets (cidm.ico, cidm.png)
-├── chrome_extension/        # Manifest V3 browser integration extension
+├── chrome_extension/        # Manifest V3 Chromium browser extension (Chrome, Edge, Brave, Opera)
 │   ├── background.js        # Service worker handling network requests & CIDM bridge
 │   ├── content.js           # Media sniffer script injected into web pages
-│   ├── manifest.json        # Extension manifest
+│   ├── manifest.json        # Chromium extension manifest
+│   ├── popup.html / popup.js# Extension popup control panel
+│   └── icons/               # Extension icons
+├── firefox_extension/       # Manifest V3 Mozilla Firefox extension (Firefox, Floorp, Zen)
+│   ├── background.js        # Background script handling network requests & CIDM bridge
+│   ├── content.js           # Media sniffer script injected into web pages
+│   ├── manifest.json        # Gecko/Firefox extension manifest with gecko ID
 │   ├── popup.html / popup.js# Extension popup control panel
 │   └── icons/               # Extension icons
 ├── vendor/                  # Bundled tools (FFmpeg binary & DLLs)
@@ -107,9 +113,8 @@ The easiest way to use CIDM is using the pre-built Windows installer or portable
 
 3. **Complete First-Run Browser Extension Setup:**
    - When CIDM launches for the first time, the **CIDM Browser Extension Setup** wizard will automatically appear.
-   - Click **Install in Google Chrome**, **Install in Microsoft Edge**, or **Install in Brave**.
-   - Your browser will open to its extensions tab with the extension path already copied to your clipboard.
-   - Turn **ON** **Developer mode** (top-right corner), click **Load unpacked** (top-left), press `Ctrl+V` to paste the path, and click **Select Folder**. Done!
+   - For **Chrome / Edge / Brave / Opera**: Click **Install**, turn **ON** **Developer mode** in your browser, click **Load unpacked**, press `Ctrl+V` to paste the folder path, and click **Select Folder**.
+   - For **Mozilla Firefox**: Click **Install in Mozilla Firefox**; Firefox will open `about:debugging#/runtime/this-firefox`. Click **Load Temporary Add-on...**, press `Ctrl+V` (the path to `manifest.json` is already copied), and click **Open**.
 
 ---
 
@@ -140,18 +145,18 @@ If you want to contribute or run CIDM directly from the Python source code:
 
 ## Browser Extension Integration
 
-CIDM captures browser downloads and video streams through its lightweight browser extension.
+CIDM captures browser downloads and video streams through its lightweight browser extensions (Chromium & Firefox).
 
 ### First-Run Automatic Setup
 When launching CIDM for the first time, an onboarding wizard automatically:
-1. Syncs extension files to `~/.cidm/extension/`.
-2. Registers extension keys in the Windows Registry for Chrome, Edge, and Brave.
-3. Automatically copies the folder path to your clipboard.
-4. Opens your browser to its extensions page (`chrome://extensions`, `edge://extensions`, `brave://extensions`).
-5. Guides you through turning on **Developer mode** and clicking **Load unpacked** (press `Ctrl+V` to paste the path).
+1. Syncs extension files to `~/.cidm/extension/chromium` and `~/.cidm/extension/firefox`.
+2. Registers extension keys in the Windows Registry for Chrome, Edge, Brave, and Firefox.
+3. Automatically copies the folder or manifest path to your clipboard.
+4. Opens your browser to its extensions page (`chrome://extensions`, `edge://extensions`, `about:debugging#/runtime/this-firefox`).
+5. Guides you through the quick 3-step activation.
 
 ### Manual Setup via Settings
-To install the extension into any other browser (e.g. Opera GX, Vivaldi, Thorium, or a portable browser):
+To install the extension into any other browser (e.g. Opera GX, Vivaldi, Thorium, Floorp, Zen, or a portable browser):
 1. Open CIDM and click **Settings** (or press the Settings icon in the sidebar).
 2. Go to the **Browser Integration** tab.
 3. Click **Browse (.exe)...** under *Add to Custom Browser of Your Choice* and select your browser's executable.
@@ -167,6 +172,7 @@ CIDM includes a single-command PowerShell release script that compiles:
 - The standalone Windows installer (`Output\CIDM_Setup.exe`) via Inno Setup.
 - A portable `.zip` distribution (`Output\CIDM_Portable_Windows_x64_v1.0.0.zip`).
 - A packaged Chrome Extension zip (`Output\CIDM_Chrome_Extension_v1.0.0.zip`).
+- A packaged Firefox Extension XPI & zip (`Output\CIDM_Firefox_Extension_v1.0.0.xpi`, `.zip`).
 
 To build:
 ```powershell
