@@ -23,7 +23,7 @@ from typing import Optional, Dict, Any, List
 import requests
 from PySide6.QtCore import QObject, QThread, Signal
 
-APP_VERSION = "1.0.1"
+APP_VERSION = "1.0.2"
 GITHUB_REPO = "Nahid-iiqbal/CIDM---Internet-Download-Manager"
 RELEASES_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 RELEASES_HTML_URL = f"https://github.com/{GITHUB_REPO}/releases"

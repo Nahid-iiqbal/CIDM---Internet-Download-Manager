@@ -4,6 +4,51 @@ All notable changes to **CIDM** are documented in this release note.
 
 ---
 
+## [v1.0.2] - 2026-11-17
+
+### 🚀 Highlights & New Features
+
+- **🔄 Automated In-App Update Engine (`updater.py`):**
+  - Direct integration with GitHub Releases API (`Nahid-iiqbal/CIDM---Internet-Download-Manager`).
+  - Seamless semantic versioning checks comparing current running app version with latest remote GitHub release tag.
+  - Non-blocking background worker threads (`UpdateCheckWorker`, `UpdateDownloadWorker`) with live progress tracking, byte counters, and download speed estimation.
+  - **1-Click Self-Update & Restart:**
+    - **Installed App:** Automatically downloads `CIDM_Setup.exe` and runs automated silent upgrade (`/SILENT /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS /SUPPRESSMSGBOXES`), smoothly replacing files in `{app}` and relaunching CIDM.
+    - **Portable App:** Automatically downloads portable archive, extracts files, and runs self-terminating background updater script that syncs the portable folder and restarts `CIDM.exe`.
+  - Rich **Update Notification Dialog (`UpdateAvailableDialog`)** displaying new version tag, release title, and scrollable Markdown changelog notes pulled directly from the GitHub release body.
+
+- **⚙️ Dedicated "Updates" Settings Tab:**
+  - Added full update configuration pane in CIDM Settings:
+    - Current installed version and release channel status.
+    - `☑ Automatically check for updates on startup (recommended)`.
+    - `☑ Automatically download updates in the background and notify when ready to restart`.
+    - **"Check for Updates Now"** button with live status feedback.
+    - Quick link to view all releases on GitHub.
+  - Added **"Check for Updates..."** action to the right-click Windows system tray menu.
+
+---
+
+### 🎨 UI Refinements & Polish
+
+- **Streamlined Status Bar:**
+  - Removed internal bridge label (`Bridge: 127.0.0.1:9632`) from the bottom status bar for a clean, distraction-free footer displaying download count, speed limiter control, and total bandwidth speed.
+- **Focused Navigation Bar:**
+  - Streamlined the top toolbar by keeping update management consolidated in Settings and the system tray.
+
+---
+
+### 📦 Release Assets (v1.0.2)
+
+| Asset Name | Description | Size |
+| :--- | :--- | :--- |
+| **`CIDM_Setup.exe`** | Windows Setup Installer with built-in auto-updater support | ~76 MB |
+| **`CIDM_Portable_Windows_x64_v1.0.2.zip`** | Standalone portable build (No installation required) | ~103 MB |
+| **`CIDM_Chrome_Extension_v1.0.2.zip`** | Manifest V3 extension package for Chromium browsers | ~28 KB |
+| **`CIDM_Firefox_Extension_v1.0.2.xpi`** | Mozilla Firefox signed/unpacked add-on package (`.xpi`) | ~28 KB |
+| **`CIDM_Firefox_Extension_v1.0.2.zip`** | Firefox extension archive | ~28 KB |
+
+---
+
 ## [v1.0.1] - 2026-11-17
 
 ### 🚀 Highlights & New Features

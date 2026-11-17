@@ -2,7 +2,7 @@
 ; Builds a clean installer (CIDM_Setup.exe) from dist\CIDM
 
 #define MyAppName "CIDM"
-#define MyAppVersion "1.0.1"
+#define MyAppVersion "1.0.2"
 #define MyAppPublisher "CIDM Team"
 #define MyAppURL "https://github.com/cidm"
 #define MyAppExeName "CIDM.exe"
