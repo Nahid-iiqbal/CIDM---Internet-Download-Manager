@@ -5249,9 +5249,6 @@ class MainWindow(QMainWindow):
         self.act_drop_target = act(
             "Drop Target", "drop_target", self.toggle_drop_target
         )
-        self.act_update = act(
-            "Updates", "update", lambda: self.check_for_updates_manual(interactive=True)
-        )
 
         tb.addSeparator()
 
@@ -5444,7 +5441,6 @@ class MainWindow(QMainWindow):
         sb = QStatusBar(self)
         self.lbl_sb_summary = QLabel("Ready  ·  0 downloads")
         self.lbl_sb_speed = QLabel("Total Speed: 0 KB/s")
-        self.lbl_sb_bridge = QLabel("Bridge: 127.0.0.1:9632")
 
         self.btn_speed_limiter = QPushButton("Limit: OFF")
         self.btn_speed_limiter.setObjectName("speedLimiterBtn")
@@ -5468,8 +5464,6 @@ class MainWindow(QMainWindow):
         sb.addPermanentWidget(self.btn_speed_limiter)
         sb.addPermanentWidget(QLabel("  |  "))
         sb.addPermanentWidget(self.lbl_sb_speed)
-        sb.addPermanentWidget(QLabel("  |  "))
-        sb.addPermanentWidget(self.lbl_sb_bridge)
         self.setStatusBar(sb)
 
     def _open_speed_limit_popup(self):
