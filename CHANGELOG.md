@@ -1,6 +1,60 @@
-# Changelog - CIDM (Custom Internet Download Manager)
+# Changelog - CIDM (Chaos Internet Download Manager)
 
 All notable changes to **CIDM** are documented in this release note.
+
+---
+
+## [v1.0.1] - 2026-11-17
+
+### 🚀 Highlights & New Features
+
+- **🦊 Full Mozilla Firefox Extension Support (Manifest V3):**
+  - Added native Gecko MV3 extension package (`firefox_extension/`) with `browser_specific_settings.gecko.id: "cidm-integration@cidm.github.com"`.
+  - Implemented cross-browser `sessionStore` storage abstraction compatible with both Firefox and Chromium.
+  - Supported Firefox download interception via `chrome.downloads.onCreated` and local HTTP JSON-RPC bridge (`127.0.0.1:9632`).
+  - Automatic detection of Mozilla Firefox, Floorp, Zen, and Waterfox from Windows Registry (`App Paths\firefox.exe`) and standard 64-bit/32-bit install paths.
+  - Guided 3-step activation walkthrough opening `about:debugging#/runtime/this-firefox` with automated 1-click clipboard copying of `manifest.json`.
+  - Added Windows Registry auto-registration under `HKCU\Software\Mozilla\Firefox\Extensions`.
+
+- **🎨 All-New Vector Brand Logo & Modern Visuals:**
+  - Replaced legacy icons with a sleek dark squircle vector badge featuring a cyan-to-emerald gradient "C" ring and bold download arrow (`assets/cidm.svg`).
+  - Generated high-resolution Windows `.ico` containing full mipmap scales (`256x256`, `128x128`, `64x64`, `48x48`, `32x32`, and `16x16`).
+  - Rendered matching high-DPI extension icons (`icon16.png`, `icon32.png`, `icon48.png`, `icon128.png`) for both Chromium and Firefox.
+  - Modernized application title, system tray icon, desktop drop target, and README headers.
+
+- **📁 Reliable Extension Auto-Sync:**
+  - Extension bundles are automatically copied and kept up-to-date in user profile directories on startup:
+    - Chromium: `~/.cidm/extension/chromium/` (and `~/.cidm/extension/`)
+    - Firefox: `~/.cidm/extension/firefox/`
+  - Redesigned "Browser Integration" settings tab with side-by-side management and one-click path copying for both browser engines.
+
+---
+
+### 🛠️ Bug Fixes & Improvements
+
+- **Fixed Missing Extension Files in Installed App:**
+  - Resolved issue where `CIDM_Setup.exe` failed to copy extension source files to `{app}`. Both Chromium and Firefox extensions are now packaged directly into `{app}\extension\chromium` and `{app}\extension\firefox`.
+  - Upgraded path resolution in `ui.py` (`get_extension_source_dir`) to check executable directories, PyInstaller temporary paths, and local source trees.
+
+- **Fixed Installer Error 183 (`Cannot create a file when that file already exists`):**
+  - Resolved a PyInstaller bundling quirk where `--add-data` previously generated `assets` as a plain file, preventing Windows from creating the `\assets\` folder.
+  - Added `[InstallDelete]` rule `Type: files; Name: "{app}\assets"` to automatically delete any stale legacy file blocking folder creation.
+
+- **Release Packaging Pipeline (`release.ps1`):**
+  - Added automated build targets for Firefox Add-on packages (`CIDM_Firefox_Extension_v1.0.1.xpi` and `CIDM_Firefox_Extension_v1.0.1.zip`).
+  - Updated Inno Setup installer script with bumped version metadata `1.0.1`.
+
+---
+
+### 📦 Release Assets (v1.0.1)
+
+| Asset Name | Description | Size |
+| :--- | :--- | :--- |
+| **`CIDM_Setup.exe`** | Windows Setup Installer (Desktop shortcut, Start menu, Extension bundles) | ~79 MB |
+| **`CIDM_Portable_Windows_x64_v1.0.1.zip`** | Standalone portable build (FFmpeg, Chromium & Firefox extensions included) | ~108 MB |
+| **`CIDM_Chrome_Extension_v1.0.1.zip`** | Manifest V3 extension for Chrome, Edge, Brave, Opera, Vivaldi | ~28 KB |
+| **`CIDM_Firefox_Extension_v1.0.1.xpi`** | Mozilla Firefox add-on package (`.xpi`) | ~28 KB |
+| **`CIDM_Firefox_Extension_v1.0.1.zip`** | Firefox extension archive | ~28 KB |
 
 ---
 

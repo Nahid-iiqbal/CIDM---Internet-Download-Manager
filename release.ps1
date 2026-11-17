@@ -1,6 +1,6 @@
 # release.ps1 - One-Command Release Packaging Script for CIDM
 param(
-    [string]$Version = "1.0.0"
+    [string]$Version = "1.0.1"
 )
 
 $ErrorActionPreference = "Stop"
