@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+  <defs>
+    <!-- Blue to emerald gradient matching the original C-ring and base -->
+    <linearGradient id="ringGrad" x1="120" y1="140" x2="390" y2="370" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="55%" stop-color="#06b6d4" />
+      <stop offset="100%" stop-color="#10b981" />
+    </linearGradient>
+
+    <linearGradient id="arrowGrad" x1="256" y1="140" x2="256" y2="336" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#ffffff" />
+    </linearGradient>
+  </defs>
+
+  <!-- 1. Dark Rounded Squircle Badge -->
+  <rect x="24" y="24" width="464" height="464" rx="108" fill="#14171d" stroke="#282d37" stroke-width="6" />
+
+  <!-- 2. Clean 4-Segment "C" Ring (No extra ticks or inner stripes) -->
+  <g stroke="url(#ringGrad)" stroke-width="28" stroke-linecap="round">
+    <!-- Top-Right Segment -->
+    <path d="M 358 176 A 136 136 0 0 0 272 122" />
+    <!-- Top-Left Segment -->
+    <path d="M 240 122 A 136 136 0 0 0 132 204" />
+    <!-- Bottom-Left Segment -->
+    <path d="M 122 236 A 136 136 0 0 0 218 386" />
+    <!-- Bottom-Right Segment -->
+    <path d="M 294 386 A 136 136 0 0 0 358 336" />
+  </g>
+
+  <!-- 3. Single Bold Downward Arrow -->
+  <path d="M 256 148 L 256 312 M 196 256 L 256 318 L 316 256" stroke="url(#arrowGrad)" stroke-width="28" stroke-linecap="round" stroke-linejoin="round" />
+
+  <!-- 4. Split Base Tray Bar -->
+  <line x1="176" y1="364" x2="236" y2="364" stroke="#10b981" stroke-width="20" stroke-linecap="round" />
+  <line x1="276" y1="364" x2="336" y2="364" stroke="#38bdf8" stroke-width="20" stroke-linecap="round" />
+</svg>

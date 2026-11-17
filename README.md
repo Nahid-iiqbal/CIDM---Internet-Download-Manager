@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![CIDM Logo](assets/cidm.ico)
+<img src="assets/cidm.png" width="128" height="128" alt="CIDM Logo" />
 
 **A high-performance, modern, multi-threaded download manager and video grabber for Windows.**
 

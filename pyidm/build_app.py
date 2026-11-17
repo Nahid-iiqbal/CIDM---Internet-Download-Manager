@@ -24,6 +24,7 @@ def ensure_icon(base_dir: Path) -> Path:
     assets_dir = base_dir / "assets"
     assets_dir.mkdir(parents=True, exist_ok=True)
     ico_path = assets_dir / "cidm.ico"
+    svg_path = assets_dir / "cidm.svg"
     legacy_ico = assets_dir / "pyidm.ico"
 
     if ico_path.exists() and ico_path.stat().st_size > 0:
@@ -36,52 +37,47 @@ def ensure_icon(base_dir: Path) -> Path:
             return legacy_ico
 
     print(f"[*] Generating multi-size Windows icon: {ico_path}")
-    qt_core = __import__("PySide6.QtCore", fromlist=("Qt",))
-    qt_gui = __import__(
-        "PySide6.QtGui",
-        fromlist=("QBrush", "QColor", "QImage", "QPainter", "QPen"),
-    )
-    Qt = qt_core.Qt
-    QBrush = qt_gui.QBrush
-    QColor = qt_gui.QColor
-    QImage = qt_gui.QImage
-    QPainter = qt_gui.QPainter
-    QPen = qt_gui.QPen
+    if svg_path.exists():
+        import struct
+        qt_core = __import__("PySide6.QtCore", fromlist=("QByteArray", "QBuffer", "QIODevice"))
+        qt_gui = __import__("PySide6.QtGui", fromlist=("QImage", "QPainter", "QGuiApplication"))
+        qt_svg = __import__("PySide6.QtSvg", fromlist=("QSvgRenderer",))
+        app = qt_gui.QGuiApplication.instance() or qt_gui.QGuiApplication(sys.argv)
+        renderer = qt_svg.QSvgRenderer(qt_core.QByteArray(svg_path.read_bytes()))
 
-    img = QImage(256, 256, QImage.Format.Format_ARGB32)
-    img.fill(Qt.GlobalColor.transparent)
-    p = QPainter(img)
-    p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        def render_png(sz: int) -> bytes:
+            img = qt_gui.QImage(sz, sz, qt_gui.QImage.Format.Format_ARGB32)
+            img.fill(0)
+            p = qt_gui.QPainter(img)
+            p.setRenderHint(qt_gui.QPainter.RenderHint.Antialiasing)
+            p.setRenderHint(qt_gui.QPainter.RenderHint.SmoothPixmapTransform)
+            renderer.render(p)
+            p.end()
+            buf = qt_core.QBuffer()
+            buf.open(qt_core.QIODevice.OpenModeFlag.WriteOnly)
+            img.save(buf, "PNG")
+            return bytes(buf.data())
 
-    # Blue rounded squircle
-    p.setBrush(QBrush(QColor("#2563eb")))
-    p.setPen(Qt.PenStyle.NoPen)
-    p.drawRoundedRect(8, 8, 240, 240, 56, 56)
-
-    # White download arrow and tray base
-    pen = QPen(
-        QColor("#ffffff"),
-        20,
-        Qt.PenStyle.SolidLine,
-        Qt.PenCapStyle.RoundCap,
-        Qt.PenJoinStyle.RoundJoin,
-    )
-    p.setPen(pen)
-    # Shaft
-    p.drawLine(128, 56, 128, 152)
-    # Arrow heads
-    p.drawLine(84, 112, 128, 152)
-    p.drawLine(172, 112, 128, 152)
-    # Tray base line
-    p.drawLine(72, 192, 184, 192)
-    p.end()
-
-    img.save(str(ico_path), "ICO")
-    try:
-        shutil.copy2(ico_path, legacy_ico)
-    except Exception:
-        pass
-    return ico_path
+        sizes = [256, 128, 64, 48, 32, 16]
+        png_map = {s: render_png(s) for s in sizes}
+        header = struct.pack("<HHH", 0, 1, len(png_map))
+        entries = []
+        offset = 6 + 16 * len(png_map)
+        image_data = b""
+        for size, data in png_map.items():
+            w = size if size < 256 else 0
+            h = size if size < 256 else 0
+            entry = struct.pack("<BBBBHHII", w, h, 0, 0, 1, 32, len(data), offset)
+            entries.append(entry)
+            image_data += data
+            offset += len(data)
+        ico_bytes = header + b"".join(entries) + image_data
+        ico_path.write_bytes(ico_bytes)
+        try:
+            shutil.copy2(ico_path, legacy_ico)
+        except Exception:
+            pass
+        return ico_path
 
 
 def find_or_bundle_ffmpeg(base_dir: Path) -> Path | None:

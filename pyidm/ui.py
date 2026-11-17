@@ -1172,6 +1172,7 @@ def create_app_icon() -> QIcon:
     icon = QIcon()
     for fname in (
         "cidm.ico",
+        "cidm.svg",
         "cidm.png",
         "cidm_512.png",
         "pyidm.ico",

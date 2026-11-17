@@ -51,6 +51,8 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "A
 [Files]
 Source: "dist\CIDM\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "assets\cidm.ico"; DestDir: "{app}\assets"; Flags: ignoreversion
+Source: "assets\cidm.png"; DestDir: "{app}\assets"; Flags: ignoreversion
+Source: "assets\cidm.svg"; DestDir: "{app}\assets"; Flags: ignoreversion
 Source: "chrome_extension\*"; DestDir: "{app}\extension\chromium"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "chrome_extension\*"; DestDir: "{app}\extension"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "chrome_extension\*"; DestDir: "{app}\chrome_extension"; Flags: ignoreversion recursesubdirs createallsubdirs
