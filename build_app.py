@@ -263,8 +263,10 @@ def build(
         cmd.append("--onefile")
 
     sep = ";" if os.name == "nt" else ":"
+    assets_dir = base_dir / "assets"
+    if assets_dir.exists():
+        cmd.append(f"--add-data={str(assets_dir)}{sep}assets")
     if ico_path and ico_path.exists():
-        cmd.append(f"--add-data={str(ico_path)}{sep}assets")
         cmd.append(f"--add-data={str(ico_path)}{sep}.")
 
     chrome_ext_dir = base_dir / "chrome_extension"
@@ -309,7 +311,17 @@ def build(
     dist_dir = base_dir / "dist" / "CIDM" if onedir else base_dir / "dist"
 
     if onedir and dist_dir.exists():
-        print("[*] Copying browser extension packages to distribution directory...")
+        print("[*] Copying assets and browser extension packages to distribution directory...")
+        assets_dist = dist_dir / "assets"
+        if assets_dist.is_file():
+            assets_dist.unlink()
+        assets_dist.mkdir(parents=True, exist_ok=True)
+        if assets_dir.exists():
+            for f in assets_dir.iterdir():
+                if f.is_file():
+                    shutil.copy2(f, assets_dist / f.name)
+            print("    Copied assets folder -> dist/CIDM/assets")
+
         if chrome_ext_dir.exists():
             shutil.copytree(chrome_ext_dir, dist_dir / "extension" / "chromium", dirs_exist_ok=True)
             shutil.copytree(chrome_ext_dir, dist_dir / "extension", dirs_exist_ok=True)

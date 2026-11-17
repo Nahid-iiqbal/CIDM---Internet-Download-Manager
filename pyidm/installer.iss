@@ -50,9 +50,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "A
 
 [Files]
 Source: "dist\CIDM\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "assets\cidm.ico"; DestDir: "{app}\assets"; Flags: ignoreversion
-Source: "assets\cidm.png"; DestDir: "{app}\assets"; Flags: ignoreversion
-Source: "assets\cidm.svg"; DestDir: "{app}\assets"; Flags: ignoreversion
+Source: "assets\*"; DestDir: "{app}\assets"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "chrome_extension\*"; DestDir: "{app}\extension\chromium"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "chrome_extension\*"; DestDir: "{app}\extension"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "chrome_extension\*"; DestDir: "{app}\chrome_extension"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -77,6 +75,8 @@ Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChang
 Filename: "taskkill.exe"; Parameters: "/F /IM {#MyAppExeName} /T"; Flags: runhidden; RunOnceId: "KillCIDMBeforeUninstall"
 
 [InstallDelete]
+; If an older or failed installation created 'assets' as a file, remove it so the assets directory can be created
+Type: files; Name: "{app}\assets"
 ; Clean up any leftover temporary fragment files
 Type: files; Name: "{app}\*.cidm_part"
 Type: files; Name: "{app}\*.pyidm_part"
