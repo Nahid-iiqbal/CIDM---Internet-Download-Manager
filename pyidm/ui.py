@@ -9,6 +9,7 @@ import subprocess
 import sys
 import threading
 import time
+import webbrowser
 from typing import Any, Dict, List, Optional
 
 # Ensure Windows Taskbar associates process with CIDM custom icon
@@ -22,10 +23,7 @@ if sys.platform == "win32":
         pass
 
 from PySide6.QtCore import (  # type: ignore[import-not-found]
-    QDate,
-    QDateTime,
     QPoint,
-    QRect,
     QRectF,
     QSettings,
     QSize,
@@ -44,7 +42,6 @@ from PySide6.QtGui import (  # type: ignore[import-not-found]
     QIcon,
     QKeySequence,
     QPainter,
-    QPainterPath,
     QPen,
     QPixmap,
     QPolygonF,
@@ -73,15 +70,14 @@ from PySide6.QtWidgets import (  # type: ignore[import-not-found]
     QProgressBar,
     QPushButton,
     QScrollArea,
-    QSizePolicy,
     QSpinBox,
     QSplitter,
     QStatusBar,
-    QStyle,
     QSystemTrayIcon,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
+    QTextBrowser,
     QTextEdit,
     QTimeEdit,
     QToolBar,
@@ -92,7 +88,6 @@ from PySide6.QtWidgets import (  # type: ignore[import-not-found]
 
 from engine import (
     DEFAULT_USER_AGENT,
-    DownloadError,
     DownloadTask,
     MediaDownloadTask,
     QualityOption,
@@ -115,12 +110,20 @@ from engine import (
     probe_media,
     probe_url,
     resolve_destination_folder,
-    resolve_file_conflict,
-    resolve_media_format_selector,
     sanitize_filename,
     task_from_dict,
 )
-from grabber import GrabbedItem, PRESET_EXTENSIONS, SiteGrabber
+from grabber import GrabbedItem, SiteGrabber
+from updater import (
+    APP_VERSION,
+    UpdateInfo,
+    UpdateCheckWorker,
+    UpdateDownloadWorker,
+    check_for_update,
+    apply_update_and_restart,
+    is_newer_version,
+    RELEASES_HTML_URL,
+)
 
 QUEUE_PATH = os.path.join(os.path.expanduser("~"), ".cidm", "queue.json")
 _LEGACY_QUEUE = os.path.join(os.path.expanduser("~"), ".pyidm", "queue.json")
@@ -965,6 +968,10 @@ def make_vector_icon(kind: str, color: str = "#e6e8ec", size: int = 18) -> QIcon
             p.rotate(deg)
             p.drawLine(0, int(-s / 2.0 + 2.0), 0, int(-s / 2.0 + 4.0))
             p.restore()
+    elif kind in ("update", "sync"):
+        p.drawArc(QRectF(3.5, 3.5, s - 7.0, s - 7.0), int(45 * 16), int(270 * 16))
+        p.drawLine(int(s - 3.5), int(s / 2), int(s - 7.0), int(s / 2 - 3.5))
+        p.drawLine(int(s - 3.5), int(s / 2), int(s - 0.5), int(s / 2 - 3.5))
     elif kind == "search":
         r = s / 2.0 - 4.0
         p.drawEllipse(QRectF(3.5, 3.5, r * 2.0, r * 2.0))
@@ -1057,6 +1064,10 @@ DEFAULT_SETTINGS = {
     "proxy_pool_include_direct": True,
     "extension_installed_prompt_shown": False,
     "custom_browser_path": "",
+    "auto_check_updates": True,
+    "auto_download_updates": False,
+    "skipped_update_version": "",
+    "last_update_check_time": 0,
     "queues_config": {
         "Main Download Queue": {
             "max_concurrent": 3,
@@ -1146,7 +1157,11 @@ def load_settings() -> dict:
             if isinstance(data, dict):
                 settings.update(data)
         except Exception:
-            pass
+            # Corrupt settings file: keep a copy for recovery and fall back to defaults.
+            try:
+                shutil.copy2(SETTINGS_PATH, SETTINGS_PATH + ".corrupt")
+            except Exception:
+                pass
     if sys.platform == "win32":
         settings["run_on_startup"] = get_windows_startup_enabled()
     apply_engine_settings(settings)
@@ -1156,8 +1171,11 @@ def load_settings() -> dict:
 def save_settings(settings: dict) -> None:
     try:
         os.makedirs(os.path.dirname(SETTINGS_PATH), exist_ok=True)
-        with open(SETTINGS_PATH, "w", encoding="utf-8") as f:
+        # Write-then-rename so a crash mid-write can't leave a truncated file.
+        tmp_path = SETTINGS_PATH + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(settings, f, indent=2)
+        os.replace(tmp_path, SETTINGS_PATH)
     except Exception:
         pass
     if sys.platform == "win32" and "run_on_startup" in settings:
@@ -1826,6 +1844,213 @@ class FirstRunExtensionDialog(QDialog):
 
 
 # --------------------------------------------------------------------------- #
+# Software Update Dialog
+# --------------------------------------------------------------------------- #
+class UpdateAvailableDialog(QDialog):
+    """Modern modal dialog prompting user when a newer CIDM release is detected."""
+
+    def __init__(
+        self,
+        update_info: UpdateInfo,
+        parent: Optional[QWidget] = None,
+    ):
+        super().__init__(parent)
+        self.update_info = update_info
+        self.setWindowTitle(f"CIDM Update Available — {update_info.tag_name}")
+        self.resize(580, 440)
+        self.setModal(True)
+        self._download_worker: Optional[UpdateDownloadWorker] = None
+        self._downloaded_file: str = ""
+
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(20, 20, 20, 20)
+        lay.setSpacing(14)
+
+        header = QHBoxLayout()
+        header.setSpacing(14)
+        icon_lbl = QLabel()
+        icon_lbl.setPixmap(create_app_icon().pixmap(46, 46))
+        header.addWidget(icon_lbl)
+
+        title_col = QVBoxLayout()
+        title_col.setSpacing(3)
+        lbl_title = QLabel("A new version of CIDM is available!")
+        lbl_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #4f86c6;")
+        lbl_ver = QLabel(
+            f"<b>{update_info.tag_name}</b> is ready to install (current version: v{APP_VERSION})."
+        )
+        lbl_ver.setStyleSheet("font-size: 12px; color: #e6e8ec;")
+        title_col.addWidget(lbl_title)
+        title_col.addWidget(lbl_ver)
+        header.addLayout(title_col, 1)
+        lay.addLayout(header)
+
+        # Release notes view
+        gb_notes = QGroupBox("Release Notes & Highlights")
+        gb_lay = QVBoxLayout(gb_notes)
+        gb_lay.setContentsMargins(10, 10, 10, 10)
+        self.notes_browser = QTextBrowser()
+        self.notes_browser.setOpenExternalLinks(True)
+        self.notes_browser.setStyleSheet(
+            "background-color: #121316; border: 1px solid #33373e; border-radius: 4px; padding: 6px; font-size: 12px; color: #cbd5e1;"
+        )
+        self.notes_browser.setMarkdown(self.update_info.display_notes)
+        gb_lay.addWidget(self.notes_browser)
+        lay.addWidget(gb_notes, 1)
+
+        # Download progress container (hidden initially)
+        self.progress_container = QWidget()
+        prog_lay = QVBoxLayout(self.progress_container)
+        prog_lay.setContentsMargins(0, 0, 0, 0)
+        prog_lay.setSpacing(6)
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setFixedHeight(18)
+        self.progress_bar.setStyleSheet(
+            "QProgressBar { background-color: #202226; border: 1px solid #33373e; border-radius: 4px; text-align: center; color: #ffffff; font-weight: bold; font-size: 11px; }"
+            "QProgressBar::chunk { background-color: #4f86c6; border-radius: 3px; }"
+        )
+        self.lbl_progress_status = QLabel("Preparing download...")
+        self.lbl_progress_status.setStyleSheet("font-size: 11px; color: #9aa0aa;")
+        prog_lay.addWidget(self.lbl_progress_status)
+        prog_lay.addWidget(self.progress_bar)
+        self.progress_container.hide()
+        lay.addWidget(self.progress_container)
+
+        # Buttons
+        self.btn_layout = QHBoxLayout()
+        self.btn_layout.setSpacing(8)
+
+        self.btn_skip = QPushButton("Skip This Version")
+        self.btn_skip.setAutoDefault(False)
+        self.btn_skip.clicked.connect(self._skip_version)
+        self.btn_layout.addWidget(self.btn_skip)
+
+        self.btn_view_web = QPushButton("View on GitHub")
+        self.btn_view_web.setAutoDefault(False)
+        self.btn_view_web.clicked.connect(self._open_web)
+        self.btn_layout.addWidget(self.btn_view_web)
+
+        self.btn_layout.addStretch(1)
+
+        self.btn_later = QPushButton("Remind Me Later")
+        self.btn_later.setAutoDefault(False)
+        self.btn_later.clicked.connect(self.reject)
+        self.btn_layout.addWidget(self.btn_later)
+
+        self.btn_update = QPushButton("Update & Restart")
+        self.btn_update.setObjectName("primaryBtn")
+        self.btn_update.setDefault(True)
+        self.btn_update.clicked.connect(self._start_update)
+        self.btn_layout.addWidget(self.btn_update)
+
+        self.btn_cancel_dl = QPushButton("Cancel Download")
+        self.btn_cancel_dl.setAutoDefault(False)
+        self.btn_cancel_dl.clicked.connect(self._cancel_download)
+        self.btn_cancel_dl.hide()
+        self.btn_layout.addWidget(self.btn_cancel_dl)
+
+        lay.addLayout(self.btn_layout)
+
+    def _open_web(self):
+        webbrowser.open(self.update_info.html_url)
+
+    def _skip_version(self):
+        parent_w = self.parent()
+        if parent_w and hasattr(parent_w, "app_settings"):
+            parent_w.app_settings["skipped_update_version"] = self.update_info.tag_name
+            save_settings(parent_w.app_settings)
+        self.reject()
+
+    def _start_update(self):
+        asset = self.update_info.preferred_asset
+        if not asset or not asset.url:
+            QMessageBox.warning(
+                self,
+                "Asset Not Found",
+                "No installable asset found for this release.\n"
+                "Opening the GitHub releases page instead.",
+            )
+            self._open_web()
+            self.reject()
+            return
+
+        # Switch to downloading UI state
+        self.btn_update.hide()
+        self.btn_later.hide()
+        self.btn_skip.hide()
+        self.btn_view_web.hide()
+        self.btn_cancel_dl.show()
+        self.progress_container.show()
+        self.lbl_progress_status.setText(f"Connecting to download {asset.name}...")
+
+        self._download_worker = UpdateDownloadWorker(
+            asset_url=asset.url,
+            target_filename=asset.name,
+            parent=self,
+        )
+        self._download_worker.progress.connect(self._on_download_progress)
+        self._download_worker.finished.connect(self._on_download_finished)
+        self._download_worker.failed.connect(self._on_download_failed)
+        self._download_worker.start()
+
+    def _cancel_download(self):
+        if self._download_worker and self._download_worker.isRunning():
+            self._download_worker.cancel()
+        self.progress_container.hide()
+        self.btn_cancel_dl.hide()
+        self.btn_update.show()
+        self.btn_later.show()
+        self.btn_skip.show()
+        self.btn_view_web.show()
+
+    def _on_download_progress(self, pct: int, downloaded: int, total: int, speed: float):
+        self.progress_bar.setValue(pct)
+        mb_down = downloaded / (1024 * 1024)
+        mb_total = total / (1024 * 1024)
+        sp_str = f"{speed / 1024:.2f} MB/s" if speed >= 1024 else f"{speed:.1f} KB/s"
+        self.lbl_progress_status.setText(
+            f"Downloading update: {pct}% ({mb_down:.1f} / {mb_total:.1f} MB) — {sp_str}"
+        )
+
+    def _on_download_finished(self, local_path: str):
+        self._downloaded_file = local_path
+        self.lbl_progress_status.setText("Download complete! Launching updater...")
+        self.progress_bar.setValue(100)
+
+        # Give short moment then apply update and terminate current app
+        QTimer.singleShot(600, self._apply_update_now)
+
+    def _apply_update_now(self):
+        if not self._downloaded_file or not os.path.isfile(self._downloaded_file):
+            return
+        success = apply_update_and_restart(self._downloaded_file, silent=True)
+        if success:
+            app = QApplication.instance()
+            if app:
+                app.quit()
+        else:
+            QMessageBox.warning(
+                self,
+                "Update Launch Failed",
+                "Could not automatically launch the update installer.\n"
+                f"The downloaded file is saved at:\n{self._downloaded_file}\n\n"
+                "You can run it manually to update.",
+            )
+            self._cancel_download()
+
+    def _on_download_failed(self, err_msg: str):
+        QMessageBox.critical(
+            self,
+            "Download Error",
+            f"Failed to download the update:\n{err_msg}\n\n"
+            "Please check your internet connection or download from GitHub directly.",
+        )
+        self._cancel_download()
+
+
+# --------------------------------------------------------------------------- #
 # Settings Dialog
 # --------------------------------------------------------------------------- #
 class SettingsDialog(QDialog):
@@ -1847,6 +2072,7 @@ class SettingsDialog(QDialog):
         self._build_downloads_tab()
         self._build_browser_tab()
         self._build_network_tab()
+        self._build_updates_tab()
         layout.addWidget(self.tabs)
 
         btn_box = QHBoxLayout()
@@ -2439,6 +2665,139 @@ class SettingsDialog(QDialog):
         box.setStandardButtons(QMessageBox.StandardButton.Ok)
         box.exec()
 
+    def _build_updates_tab(self):
+        w = QWidget()
+        lay = QVBoxLayout(w)
+        lay.setContentsMargins(16, 16, 16, 16)
+        lay.setSpacing(14)
+
+        # 1. Version Info Group
+        gb_ver = QGroupBox("CIDM Version & Release Channel")
+        gb_ver_lay = QVBoxLayout(gb_ver)
+        gb_ver_lay.setSpacing(8)
+
+        v_row = QHBoxLayout()
+        v_row.setSpacing(12)
+        v_icon = QLabel()
+        v_icon.setPixmap(create_app_icon().pixmap(38, 38))
+        v_row.addWidget(v_icon)
+
+        v_info = QVBoxLayout()
+        v_info.setSpacing(3)
+        lbl_name = QLabel("<b>CIDM — Chaos Internet Download Manager</b>")
+        lbl_name.setStyleSheet("font-size: 13px; color: #4f86c6;")
+        lbl_cur = QLabel(f"Current Installed Version: <b>v{APP_VERSION}</b>")
+        lbl_cur.setStyleSheet("font-size: 12px; color: #e6e8ec;")
+        lbl_channel = QLabel("Channel: Official GitHub Releases (Automatic Updates)")
+        lbl_channel.setStyleSheet("font-size: 11px; color: #9aa0aa;")
+        v_info.addWidget(lbl_name)
+        v_info.addWidget(lbl_cur)
+        v_info.addWidget(lbl_channel)
+        v_row.addLayout(v_info, 1)
+        gb_ver_lay.addLayout(v_row)
+        lay.addWidget(gb_ver)
+
+        # 2. Update Preferences
+        gb_pref = QGroupBox("Automatic Update Settings")
+        gb_pref_lay = QVBoxLayout(gb_pref)
+        gb_pref_lay.setSpacing(10)
+
+        self.cb_auto_update = QCheckBox(
+            "Automatically check for updates on startup (recommended)"
+        )
+        self.cb_auto_update.setChecked(
+            bool(self.settings.get("auto_check_updates", True))
+        )
+        gb_pref_lay.addWidget(self.cb_auto_update)
+
+        self.cb_auto_download = QCheckBox(
+            "Automatically download updates in the background and notify when ready to restart"
+        )
+        self.cb_auto_download.setChecked(
+            bool(self.settings.get("auto_download_updates", False))
+        )
+        gb_pref_lay.addWidget(self.cb_auto_download)
+
+        lay.addWidget(gb_pref)
+
+        # 3. Check for Updates Now
+        gb_check = QGroupBox("Check for Updates")
+        gb_check_lay = QVBoxLayout(gb_check)
+        gb_check_lay.setSpacing(10)
+
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(10)
+
+        self.btn_check_now = QPushButton("Check for Updates Now")
+        self.btn_check_now.setObjectName("primaryBtn")
+        self.btn_check_now.setAutoDefault(False)
+        self.btn_check_now.clicked.connect(self._manual_check_updates)
+        btn_row.addWidget(self.btn_check_now)
+
+        self.btn_view_releases = QPushButton("View Releases on GitHub")
+        self.btn_view_releases.setAutoDefault(False)
+        self.btn_view_releases.clicked.connect(lambda: webbrowser.open(RELEASES_HTML_URL))
+        btn_row.addWidget(self.btn_view_releases)
+
+        btn_row.addStretch(1)
+        gb_check_lay.addLayout(btn_row)
+
+        self.lbl_update_status = QLabel(
+            "Click 'Check for Updates Now' to check GitHub for newer versions."
+        )
+        self.lbl_update_status.setStyleSheet("color: #9aa0aa; font-size: 11px;")
+        gb_check_lay.addWidget(self.lbl_update_status)
+
+        lay.addWidget(gb_check)
+        lay.addStretch(1)
+
+        self.tabs.addTab(w, "Updates")
+
+    def _manual_check_updates(self):
+        self.btn_check_now.setEnabled(False)
+        self.lbl_update_status.setText("Connecting to GitHub Releases API...")
+        self.lbl_update_status.setStyleSheet("color: #4f86c6; font-size: 11px;")
+
+        self._settings_check_worker = UpdateCheckWorker(
+            current_version=APP_VERSION, parent=self
+        )
+        self._settings_check_worker.update_available.connect(self._on_settings_update_available)
+        self._settings_check_worker.up_to_date.connect(self._on_settings_up_to_date)
+        self._settings_check_worker.check_failed.connect(self._on_settings_check_failed)
+        self._settings_check_worker.start()
+
+    def _on_settings_update_available(self, update_info: UpdateInfo):
+        self.btn_check_now.setEnabled(True)
+        self.lbl_update_status.setText(
+            f"Update Available: <b>{update_info.tag_name}</b> ({update_info.title})"
+        )
+        self.lbl_update_status.setStyleSheet("color: #57ab5a; font-size: 11px;")
+        dlg = UpdateAvailableDialog(update_info, parent=self)
+        dlg.exec()
+
+    def _on_settings_up_to_date(self, cur_ver: str):
+        self.btn_check_now.setEnabled(True)
+        self.lbl_update_status.setText(
+            f"You are running the latest version: <b>v{cur_ver}</b>."
+        )
+        self.lbl_update_status.setStyleSheet("color: #57ab5a; font-size: 11px;")
+        QMessageBox.information(
+            self,
+            "CIDM Up to Date",
+            f"You are using the latest version of CIDM (v{cur_ver})!\nNo updates are needed.",
+        )
+
+    def _on_settings_check_failed(self, err_msg: str):
+        self.btn_check_now.setEnabled(True)
+        self.lbl_update_status.setText(f"Check failed: {err_msg}")
+        self.lbl_update_status.setStyleSheet("color: #cf5c5c; font-size: 11px;")
+        QMessageBox.warning(
+            self,
+            "Update Check Failed",
+            f"Could not connect to GitHub to check for updates:\n{err_msg}\n\n"
+            "Please check your internet connection.",
+        )
+
     def values(self) -> dict:
         checked_ifaces = [
             iface["name"]
@@ -2477,6 +2836,12 @@ class SettingsDialog(QDialog):
             "extension_installed_prompt_shown": self.settings.get(
                 "extension_installed_prompt_shown", False
             ),
+            "auto_check_updates": self.cb_auto_update.isChecked()
+            if hasattr(self, "cb_auto_update")
+            else self.settings.get("auto_check_updates", True),
+            "auto_download_updates": self.cb_auto_download.isChecked()
+            if hasattr(self, "cb_auto_download")
+            else self.settings.get("auto_download_updates", False),
         }
 
     def reject(self):
@@ -4787,6 +5152,10 @@ class MainWindow(QMainWindow):
         if not self.app_settings.get("extension_installed_prompt_shown", False):
             QTimer.singleShot(750, self._check_first_run_extension)
 
+        # Automated update check
+        if self.app_settings.get("auto_check_updates", True):
+            QTimer.singleShot(3500, self._check_updates_startup)
+
 # ----- theme management ------------------------------------------------- #
     def apply_theme(self, theme_name: str):
         self.current_theme = theme_name
@@ -4879,6 +5248,9 @@ class MainWindow(QMainWindow):
         )
         self.act_drop_target = act(
             "Drop Target", "drop_target", self.toggle_drop_target
+        )
+        self.act_update = act(
+            "Updates", "update", lambda: self.check_for_updates_manual(interactive=True)
         )
 
         tb.addSeparator()
@@ -5482,6 +5854,58 @@ class MainWindow(QMainWindow):
         self.app_settings["extension_installed_prompt_shown"] = True
         save_settings(self.app_settings)
 
+    def _check_updates_startup(self):
+        if self._is_quitting:
+            return
+        self._startup_update_worker = UpdateCheckWorker(
+            current_version=APP_VERSION, parent=self
+        )
+        self._startup_update_worker.update_available.connect(self._on_startup_update_found)
+        self._startup_update_worker.start()
+
+    def _on_startup_update_found(self, update_info: UpdateInfo):
+        if self._is_quitting:
+            return
+        skipped = self.app_settings.get("skipped_update_version", "")
+        if skipped and skipped == update_info.tag_name:
+            return
+
+        dlg = UpdateAvailableDialog(update_info, parent=self)
+        if self.app_settings.get("auto_download_updates", False):
+            dlg._start_update()
+        dlg.exec()
+
+    def check_for_updates_manual(self, interactive: bool = True):
+        self._manual_update_worker = UpdateCheckWorker(
+            current_version=APP_VERSION, parent=self
+        )
+
+        def on_avail(up: UpdateInfo):
+            dlg = UpdateAvailableDialog(up, parent=self)
+            dlg.exec()
+
+        def on_up_to_date(v: str):
+            if interactive:
+                QMessageBox.information(
+                    self,
+                    "CIDM Up to Date",
+                    f"You are running the latest version of CIDM (v{v})!\nNo updates are needed.",
+                )
+
+        def on_failed(err: str):
+            if interactive:
+                QMessageBox.warning(
+                    self,
+                    "Update Check Failed",
+                    f"Could not connect to GitHub to check for updates:\n{err}\n\n"
+                    "Please check your internet connection.",
+                )
+
+        self._manual_update_worker.update_available.connect(on_avail)
+        self._manual_update_worker.up_to_date.connect(on_up_to_date)
+        self._manual_update_worker.check_failed.connect(on_failed)
+        self._manual_update_worker.start()
+
     def apply_settings(self, settings: dict):
         self.app_settings.update(settings)
         save_settings(self.app_settings)
@@ -5821,6 +6245,10 @@ class MainWindow(QMainWindow):
 
         act_resume_all = tray_menu.addAction("Resume All Downloads")
         act_resume_all.triggered.connect(self.resume_all)
+        tray_menu.addSeparator()
+
+        act_update = tray_menu.addAction("Check for Updates...")
+        act_update.triggered.connect(lambda: self.check_for_updates_manual(interactive=True))
         tray_menu.addSeparator()
 
         act_quit = tray_menu.addAction("Quit CIDM")

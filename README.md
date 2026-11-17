@@ -48,6 +48,11 @@
 - **Manual Browser Selector:** Settings tab to install the extension into any custom browser executable (`.exe`).
 - **Download Interception:** Seamlessly passes browser download requests to CIDM via local HTTP bridge (`127.0.0.1:9632`).
 
+### 🔄 Automatic In-App Updates
+- **Seamless GitHub Releases Sync:** Automatically checks for new releases on startup and notifies you with release highlights and changelogs.
+- **1-Click Self-Update:** Downloads and applies new releases automatically in the background, upgrading Inno Setup installations or Portable packages without manual file copying.
+- **Customizable Preferences:** Configurable update checks, background downloads, version skipping, and manual "Check for Updates Now" control.
+
 ### 🎛️ Modern, Compact UI
 - **Dual Themes:** Clean, compact Dark Grey and Light themes with high-density table views and customizable column headers.
 - **Categories & Auto-Sorting:** Automatically routes downloads into dedicated subfolders (`Compressed`, `Videos`, `Programs`, `Documents`, `Music`).
@@ -80,6 +85,7 @@ idm2/
 ├── grabber.py               # Video streaming sniffer & extractor interface
 ├── main.py                  # Application entry point, single-instance mutex & tray
 ├── server.py                # Local HTTP JSON-RPC bridge server (port 9632)
+├── updater.py               # Automated GitHub release checking & self-update engine
 ├── ui.py                    # PySide6 desktop interface, themes, & dialogs
 ├── build_app.py             # PyInstaller packaging automation script
 ├── installer.iss            # Inno Setup 6 installer compilation script

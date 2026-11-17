@@ -242,6 +242,7 @@ def build(
         "--hidden-import=server",
         "--hidden-import=ui",
         "--hidden-import=grabber",
+        "--hidden-import=updater",
         "--hidden-import=yt_dlp",
         "--hidden-import=yt_dlp.compat",
         "--hidden-import=yt_dlp.utils",
