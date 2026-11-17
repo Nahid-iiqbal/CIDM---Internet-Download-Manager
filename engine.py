@@ -790,6 +790,7 @@ def probe_url(
     user_agent: Optional[str] = None,
     referer: Optional[str] = None,
     timeout: tuple = (CONNECT_TIMEOUT, 20),
+    _depth: int = 0,
 ) -> ProbeResult:
     """HEAD the URL (following redirects). If HEAD fails or gives no length,
     fall back to a 1-byte ranged GET which also reveals range support."""
@@ -851,7 +852,7 @@ def probe_url(
                 final_url = r.url or final_url
 
                 # Check for Google Drive virus warning HTML confirmation page
-                if "google.com" in final_url or "googleusercontent.com" in final_url:
+                if _depth < 3 and ("google.com" in final_url or "googleusercontent.com" in final_url):
                     c_type = (r.headers.get("Content-Type") or "").lower()
                     if "text/html" in c_type:
                         try:
@@ -861,7 +862,7 @@ def probe_url(
                                 conf_link = m_confirm.group(1).replace("&amp;", "&")
                                 if conf_link.startswith("/"):
                                     conf_link = "https://drive.google.com" + conf_link
-                                return probe_url(conf_link, cookies, user_agent, referer, timeout)
+                                return probe_url(conf_link, cookies, user_agent, referer, timeout, _depth + 1)
                             m_token = re.search(r'name="confirm"\s+value="([^"]+)"', chunk) or re.search(r'confirm=([0-9A-Za-z_-]+)', chunk)
                             if m_token:
                                 token = m_token.group(1)
@@ -869,7 +870,7 @@ def probe_url(
                                     confirmed_url = f"{final_url}&confirm={token}"
                                 else:
                                     confirmed_url = re.sub(r'confirm=[^&]*', f'confirm={token}', final_url)
-                                return probe_url(confirmed_url, cookies, user_agent, referer, timeout)
+                                return probe_url(confirmed_url, cookies, user_agent, referer, timeout, _depth + 1)
                         except Exception:
                             pass
             finally:

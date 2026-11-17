@@ -22,10 +22,7 @@ if sys.platform == "win32":
         pass
 
 from PySide6.QtCore import (  # type: ignore[import-not-found]
-    QDate,
-    QDateTime,
     QPoint,
-    QRect,
     QRectF,
     QSettings,
     QSize,
@@ -44,7 +41,6 @@ from PySide6.QtGui import (  # type: ignore[import-not-found]
     QIcon,
     QKeySequence,
     QPainter,
-    QPainterPath,
     QPen,
     QPixmap,
     QPolygonF,
@@ -73,11 +69,9 @@ from PySide6.QtWidgets import (  # type: ignore[import-not-found]
     QProgressBar,
     QPushButton,
     QScrollArea,
-    QSizePolicy,
     QSpinBox,
     QSplitter,
     QStatusBar,
-    QStyle,
     QSystemTrayIcon,
     QTableWidget,
     QTableWidgetItem,
@@ -92,7 +86,6 @@ from PySide6.QtWidgets import (  # type: ignore[import-not-found]
 
 from engine import (
     DEFAULT_USER_AGENT,
-    DownloadError,
     DownloadTask,
     MediaDownloadTask,
     QualityOption,
@@ -115,12 +108,10 @@ from engine import (
     probe_media,
     probe_url,
     resolve_destination_folder,
-    resolve_file_conflict,
-    resolve_media_format_selector,
     sanitize_filename,
     task_from_dict,
 )
-from grabber import GrabbedItem, PRESET_EXTENSIONS, SiteGrabber
+from grabber import GrabbedItem, SiteGrabber
 
 QUEUE_PATH = os.path.join(os.path.expanduser("~"), ".cidm", "queue.json")
 _LEGACY_QUEUE = os.path.join(os.path.expanduser("~"), ".pyidm", "queue.json")
@@ -1146,7 +1137,11 @@ def load_settings() -> dict:
             if isinstance(data, dict):
                 settings.update(data)
         except Exception:
-            pass
+            # Corrupt settings file: keep a copy for recovery and fall back to defaults.
+            try:
+                shutil.copy2(SETTINGS_PATH, SETTINGS_PATH + ".corrupt")
+            except Exception:
+                pass
     if sys.platform == "win32":
         settings["run_on_startup"] = get_windows_startup_enabled()
     apply_engine_settings(settings)
@@ -1156,8 +1151,11 @@ def load_settings() -> dict:
 def save_settings(settings: dict) -> None:
     try:
         os.makedirs(os.path.dirname(SETTINGS_PATH), exist_ok=True)
-        with open(SETTINGS_PATH, "w", encoding="utf-8") as f:
+        # Write-then-rename so a crash mid-write can't leave a truncated file.
+        tmp_path = SETTINGS_PATH + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(settings, f, indent=2)
+        os.replace(tmp_path, SETTINGS_PATH)
     except Exception:
         pass
     if sys.platform == "win32" and "run_on_startup" in settings:

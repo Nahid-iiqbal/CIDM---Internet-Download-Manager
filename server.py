@@ -20,6 +20,9 @@ from PySide6.QtCore import QObject, Signal
 HOST = "127.0.0.1"
 PORT = 9632
 MAX_BODY_BYTES = 1024 * 1024
+MAX_BATCH_URLS = 5000
+MAX_URL_LENGTH = 8192
+APP_ID = "CIDM"
 ALLOWED_HOSTS = {f"127.0.0.1:{PORT}",
                  f"localhost:{PORT}", "127.0.0.1", "localhost"}
 
@@ -66,11 +69,16 @@ class BridgeHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            pass  # client went away; nothing to do
 
     def _host_ok(self) -> bool:
         # Blocks DNS-rebinding style requests that use a foreign Host header.
-        return self.headers.get("Host", "").lower() in ALLOWED_HOSTS
+        port = self.server.server_address[1]
+        allowed = ALLOWED_HOSTS | {f"127.0.0.1:{port}", f"localhost:{port}"}
+        return self.headers.get("Host", "").lower() in allowed
 
     # ----- verbs ------------------------------------------------------------ #
     def do_OPTIONS(self):
@@ -83,7 +91,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
         if not self._host_ok():
             return self._send_json(403, {"status": "error", "message": "bad host"})
         if urlparse(self.path).path == "/ping":
-            return self._send_json(200, {"status": "ok"})
+            return self._send_json(200, {"status": "ok", "app": APP_ID})
         self._send_json(404, {"status": "error", "message": "not found"})
 
     def do_POST(self):
@@ -131,8 +139,13 @@ class BridgeHandler(BaseHTTPRequestHandler):
             clean_urls = []
             for u in raw_urls:
                 s = str(u).strip()
-                if urlparse(s).scheme.lower() in ("http", "https"):
+                if len(s) <= MAX_URL_LENGTH and urlparse(s).scheme.lower() in ("http", "https"):
                     clean_urls.append(s)
+                if len(clean_urls) >= MAX_BATCH_URLS:
+                    break
+            clean_urls = list(dict.fromkeys(clean_urls))  # de-dupe, keep order
+            if not clean_urls:
+                return self._send_json(400, {"status": "error", "message": "no valid http(s) URLs"})
             batch_payload = {
                 "urls": clean_urls,
                 "referer": str(data.get("referer") or ""),
@@ -145,7 +158,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             return self._send_json(200, {"status": "ok", "count": len(clean_urls)})
 
         url = str(data.get("url") or "").strip()
-        if urlparse(url).scheme.lower() not in ("http", "https"):
+        if len(url) > MAX_URL_LENGTH or urlparse(url).scheme.lower() not in ("http", "https"):
             return self._send_json(400, {"status": "error", "message": "only http(s) URLs are supported"})
 
         kind = str(data.get("kind") or "").strip().lower()

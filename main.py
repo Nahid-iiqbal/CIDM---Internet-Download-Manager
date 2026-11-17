@@ -2,11 +2,15 @@
 from __future__ import annotations
 from ui import MainWindow, create_app_icon, load_settings
 from server import HOST, PORT, BridgeServer, BridgeSignals
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 import json
+import logging
 import os
+import signal
 import sys
+import traceback
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -47,12 +51,18 @@ def _setup_bundled_paths() -> None:
     ])
 
     existing_path = os.environ.get("PATH", "")
+    # Compare whole path entries (a substring test wrongly treats "C:\\foo" as
+    # already present when PATH contains "C:\\foobar").
+    present = {os.path.normcase(os.path.normpath(p))
+               for p in existing_path.split(os.pathsep) if p}
     to_prepend: list[str] = []
     for d in search_dirs:
         try:
             if d.is_dir():
                 s = str(d)
-                if s not in existing_path and s not in to_prepend:
+                key = os.path.normcase(os.path.normpath(s))
+                if key not in present:
+                    present.add(key)
                     to_prepend.append(s)
         except Exception:
             pass
@@ -63,6 +73,36 @@ def _setup_bundled_paths() -> None:
 
 
 _setup_bundled_paths()
+
+
+# --------------------------------------------------------------------------- #
+# Crash logging: unhandled exceptions go to ~/.cidm/cidm.log instead of vanishing
+# (a windowed/tray app has no console to show tracebacks).
+# --------------------------------------------------------------------------- #
+def _setup_logging() -> None:
+    try:
+        log_dir = Path.home() / ".cidm"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        logging.basicConfig(
+            filename=str(log_dir / "cidm.log"),
+            level=logging.INFO,
+            format="%(asctime)s %(levelname)s %(message)s",
+        )
+    except Exception:
+        return
+
+    def _hook(exc_type, exc, tb):
+        if issubclass(exc_type, KeyboardInterrupt):
+            sys.__excepthook__(exc_type, exc, tb)
+            return
+        logging.error("Unhandled exception:\n%s",
+                      "".join(traceback.format_exception(exc_type, exc, tb)))
+        sys.__excepthook__(exc_type, exc, tb)
+
+    sys.excepthook = _hook
+
+
+_setup_logging()
 
 # Set explicit Application User Model ID (AUMID) so Windows Taskbar groups and window
 # buttons display CIDM's custom app icon rather than generic python.exe / pythonw.exe
@@ -83,7 +123,9 @@ def is_already_running() -> bool:
             f"http://{HOST}:{PORT}/ping", method="GET")
         with urllib.request.urlopen(req, timeout=1.0) as resp:
             if resp.status == 200:
-                return True
+                # Make sure it's really CIDM and not some other local service.
+                info = json.loads(resp.read(4096).decode("utf-8", "replace"))
+                return isinstance(info, dict) and info.get("app") == "CIDM"
     except Exception:
         pass
     return False
@@ -171,6 +213,12 @@ def main() -> int:
             "CIDM will work, but browser downloads cannot be intercepted.",
         )
     app.aboutToQuit.connect(server.stop)
+
+    # Let Ctrl+C in a console quit cleanly (Qt's loop otherwise swallows SIGINT).
+    signal.signal(signal.SIGINT, lambda *_: window.quit_app())
+    _sigint_timer = QTimer()
+    _sigint_timer.start(500)           # wake the interpreter so the handler runs
+    _sigint_timer.timeout.connect(lambda: None)
 
     # Launch straight to system tray if requested via CLI or persistent settings
     start_minimized = "--minimized" in sys.argv or bool(
