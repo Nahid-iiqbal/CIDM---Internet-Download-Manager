@@ -1,12 +1,16 @@
 """main.py - Starts the local HTTP bridge and the PySide6 GUI."""
 from __future__ import annotations
 from ui import MainWindow, create_app_icon, load_settings
-from server import HOST, PORT, BridgeServer, BridgeSignals
+from server import HOST, PORT, DEFAULT_PORTS, BridgeServer, BridgeSignals
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 import json
+import logging
 import os
+import signal
 import sys
+import traceback
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -47,12 +51,18 @@ def _setup_bundled_paths() -> None:
     ])
 
     existing_path = os.environ.get("PATH", "")
+    # Compare whole path entries (a substring test wrongly treats "C:\\foo" as
+    # already present when PATH contains "C:\\foobar").
+    present = {os.path.normcase(os.path.normpath(p))
+               for p in existing_path.split(os.pathsep) if p}
     to_prepend: list[str] = []
     for d in search_dirs:
         try:
             if d.is_dir():
                 s = str(d)
-                if s not in existing_path and s not in to_prepend:
+                key = os.path.normcase(os.path.normpath(s))
+                if key not in present:
+                    present.add(key)
                     to_prepend.append(s)
         except Exception:
             pass
@@ -63,6 +73,36 @@ def _setup_bundled_paths() -> None:
 
 
 _setup_bundled_paths()
+
+
+# --------------------------------------------------------------------------- #
+# Crash logging: unhandled exceptions go to ~/.cidm/cidm.log instead of vanishing
+# (a windowed/tray app has no console to show tracebacks).
+# --------------------------------------------------------------------------- #
+def _setup_logging() -> None:
+    try:
+        log_dir = Path.home() / ".cidm"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        logging.basicConfig(
+            filename=str(log_dir / "cidm.log"),
+            level=logging.INFO,
+            format="%(asctime)s %(levelname)s %(message)s",
+        )
+    except Exception:
+        return
+
+    def _hook(exc_type, exc, tb):
+        if issubclass(exc_type, KeyboardInterrupt):
+            sys.__excepthook__(exc_type, exc, tb)
+            return
+        logging.error("Unhandled exception:\n%s",
+                      "".join(traceback.format_exception(exc_type, exc, tb)))
+        sys.__excepthook__(exc_type, exc, tb)
+
+    sys.excepthook = _hook
+
+
+_setup_logging()
 
 # Set explicit Application User Model ID (AUMID) so Windows Taskbar groups and window
 # buttons display CIDM's custom app icon rather than generic python.exe / pythonw.exe
@@ -76,24 +116,50 @@ if sys.platform == "win32":
         pass
 
 
-def is_already_running() -> bool:
-    """Check if another CIDM instance is already running and listening on the bridge port."""
+def find_running_instance_port() -> int | None:
+    """Find which port (if any) an existing CIDM instance is actively listening on."""
+    # Fast path: check cached runtime bridge_port.json first
     try:
-        req = urllib.request.Request(
-            f"http://{HOST}:{PORT}/ping", method="GET")
-        with urllib.request.urlopen(req, timeout=1.0) as resp:
-            if resp.status == 200:
-                return True
+        appdata = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA") or str(Path.home())
+        p_file = Path(appdata) / "CIDM" / "bridge_port.json"
+        if p_file.is_file():
+            data = json.loads(p_file.read_text(encoding="utf-8"))
+            p = data.get("port")
+            if isinstance(p, int):
+                req = urllib.request.Request(f"http://{HOST}:{p}/ping", method="GET")
+                with urllib.request.urlopen(req, timeout=0.6) as resp:
+                    if resp.status == 200:
+                        info = json.loads(resp.read(4096).decode("utf-8", "replace"))
+                        if isinstance(info, dict) and info.get("app") == "CIDM":
+                            return p
     except Exception:
         pass
-    return False
+
+    # Probe all default/fallback candidate ports
+    for p in DEFAULT_PORTS:
+        try:
+            req = urllib.request.Request(f"http://{HOST}:{p}/ping", method="GET")
+            with urllib.request.urlopen(req, timeout=0.35) as resp:
+                if resp.status == 200:
+                    info = json.loads(resp.read(4096).decode("utf-8", "replace"))
+                    if isinstance(info, dict) and info.get("app") == "CIDM":
+                        return p
+        except Exception:
+            pass
+    return None
 
 
-def request_focus_existing() -> None:
+def is_already_running() -> int | None:
+    """Check if another CIDM instance is already running and listening on any bridge port."""
+    return find_running_instance_port()
+
+
+def request_focus_existing(port: int | None = None) -> None:
     """Ask the existing CIDM instance to restore its main window."""
+    target_port = port or find_running_instance_port() or PORT
     try:
         req = urllib.request.Request(
-            f"http://{HOST}:{PORT}/focus",
+            f"http://{HOST}:{target_port}/focus",
             data=b"{}",
             headers={"Content-Type": "application/json"},
             method="POST",
@@ -104,12 +170,13 @@ def request_focus_existing() -> None:
         pass
 
 
-def forward_url_to_running(url: str) -> bool:
+def forward_url_to_running(url: str, port: int | None = None) -> bool:
     """Forward a download URL from CLI to the already-running CIDM instance."""
+    target_port = port or find_running_instance_port() or PORT
     try:
         data = json.dumps({"url": url}).encode("utf-8")
         req = urllib.request.Request(
-            f"http://{HOST}:{PORT}/add-download",
+            f"http://{HOST}:{target_port}/add-download",
             data=data,
             headers={"Content-Type": "application/json"},
             method="POST",
@@ -123,21 +190,22 @@ def forward_url_to_running(url: str) -> bool:
 def main() -> int:
     # Single-instance guard: if an instance is already running, forward URLs or focus and exit
     if "--force" not in sys.argv and "--restart" not in sys.argv:
-        if is_already_running():
+        running_port = is_already_running()
+        if running_port is not None:
             url_args = [
                 arg for arg in sys.argv[1:]
                 if not arg.startswith("-") and (arg.startswith("http://") or arg.startswith("https://"))
             ]
             if url_args:
                 for u in url_args:
-                    forward_url_to_running(u)
-                request_focus_existing()
-                print(f"Forwarded {len(url_args)} download(s) to running CIDM instance.")
+                    forward_url_to_running(u, running_port)
+                request_focus_existing(running_port)
+                print(f"Forwarded {len(url_args)} download(s) to running CIDM instance on port {running_port}.")
                 return 0
             print(
-                "CIDM is already running in background/tray. Bringing window to focus...")
+                f"CIDM is already running in background/tray on port {running_port}. Bringing window to focus...")
             print("To force start a new instance, run: python main.py --force")
-            request_focus_existing()
+            request_focus_existing(running_port)
             return 0
 
     app = QApplication(sys.argv)
@@ -162,15 +230,22 @@ def main() -> int:
     server = BridgeServer(signals)
     try:
         server.start()
+        logging.info("CIDM bridge server listening on %s:%d", server.host, server.port)
     except OSError as exc:
         QMessageBox.warning(
             window,
             "Browser integration unavailable",
-            f"Could not listen on {HOST}:{PORT} ({exc}).\n\n"
-            "Another process may be using this port. "
+            f"Could not listen on any local bridge port ({exc}).\n\n"
+            "Another process or security policy may be blocking local socket access. "
             "CIDM will work, but browser downloads cannot be intercepted.",
         )
     app.aboutToQuit.connect(server.stop)
+
+    # Let Ctrl+C in a console quit cleanly (Qt's loop otherwise swallows SIGINT).
+    signal.signal(signal.SIGINT, lambda *_: window.quit_app())
+    _sigint_timer = QTimer()
+    _sigint_timer.start(500)           # wake the interpreter so the handler runs
+    _sigint_timer.timeout.connect(lambda: None)
 
     # Launch straight to system tray if requested via CLI or persistent settings
     start_minimized = "--minimized" in sys.argv or bool(

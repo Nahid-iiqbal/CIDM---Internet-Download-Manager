@@ -18,10 +18,13 @@ from urllib.parse import urlparse
 from PySide6.QtCore import QObject, Signal
 
 HOST = "127.0.0.1"
-PORT = 9632
+DEFAULT_PORTS = (9632, 19632, 29632, 39632, 9633, 9634)
+PORT = DEFAULT_PORTS[0]
 MAX_BODY_BYTES = 1024 * 1024
-ALLOWED_HOSTS = {f"127.0.0.1:{PORT}",
-                 f"localhost:{PORT}", "127.0.0.1", "localhost"}
+MAX_BATCH_URLS = 5000
+MAX_URL_LENGTH = 8192
+APP_ID = "CIDM"
+ALLOWED_HOSTS = {f"127.0.0.1:{p}" for p in DEFAULT_PORTS} | {f"localhost:{p}" for p in DEFAULT_PORTS} | {"127.0.0.1", "localhost"}
 
 
 class BridgeSignals(QObject):
@@ -66,11 +69,16 @@ class BridgeHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            pass  # client went away; nothing to do
 
     def _host_ok(self) -> bool:
         # Blocks DNS-rebinding style requests that use a foreign Host header.
-        return self.headers.get("Host", "").lower() in ALLOWED_HOSTS
+        port = self.server.server_address[1]
+        allowed = ALLOWED_HOSTS | {f"127.0.0.1:{port}", f"localhost:{port}"}
+        return self.headers.get("Host", "").lower() in allowed
 
     # ----- verbs ------------------------------------------------------------ #
     def do_OPTIONS(self):
@@ -83,7 +91,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
         if not self._host_ok():
             return self._send_json(403, {"status": "error", "message": "bad host"})
         if urlparse(self.path).path == "/ping":
-            return self._send_json(200, {"status": "ok"})
+            return self._send_json(200, {"status": "ok", "app": APP_ID})
         self._send_json(404, {"status": "error", "message": "not found"})
 
     def do_POST(self):
@@ -131,8 +139,13 @@ class BridgeHandler(BaseHTTPRequestHandler):
             clean_urls = []
             for u in raw_urls:
                 s = str(u).strip()
-                if urlparse(s).scheme.lower() in ("http", "https"):
+                if len(s) <= MAX_URL_LENGTH and urlparse(s).scheme.lower() in ("http", "https"):
                     clean_urls.append(s)
+                if len(clean_urls) >= MAX_BATCH_URLS:
+                    break
+            clean_urls = list(dict.fromkeys(clean_urls))  # de-dupe, keep order
+            if not clean_urls:
+                return self._send_json(400, {"status": "error", "message": "no valid http(s) URLs"})
             batch_payload = {
                 "urls": clean_urls,
                 "referer": str(data.get("referer") or ""),
@@ -145,7 +158,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             return self._send_json(200, {"status": "ok", "count": len(clean_urls)})
 
         url = str(data.get("url") or "").strip()
-        if urlparse(url).scheme.lower() not in ("http", "https"):
+        if len(url) > MAX_URL_LENGTH or urlparse(url).scheme.lower() not in ("http", "https"):
             return self._send_json(400, {"status": "error", "message": "only http(s) URLs are supported"})
 
         kind = str(data.get("kind") or "").strip().lower()
@@ -183,16 +196,63 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
 
 class BridgeServer:
-    def __init__(self, signals: BridgeSignals, host: str = HOST, port: int = PORT):
+    def __init__(self, signals: BridgeSignals, host: str = HOST, ports: list[int] | tuple[int, ...] | int | None = None):
         self._signals = signals
-        self._address = (host, port)
+        self._host = host
+        if ports is None:
+            self._ports = list(DEFAULT_PORTS)
+        elif isinstance(ports, int):
+            self._ports = [ports]
+        else:
+            self._ports = list(ports)
+        self._port = self._ports[0]
+        self._address = (self._host, self._port)
         self._httpd = None
         self._thread = None
 
+    @property
+    def host(self) -> str:
+        return self._host
+
+    @property
+    def port(self) -> int:
+        return self._port
+
+    @property
+    def address(self) -> tuple[str, int]:
+        return (self._host, self._port)
+
     def start(self) -> None:
-        """Bind and serve in a daemon thread. Raises OSError if the port is taken."""
-        self._httpd = _BridgeHTTPServer(
-            self._address, BridgeHandler, self._signals)
+        """Bind and serve in a daemon thread, trying candidate ports until one succeeds."""
+        last_exc = None
+        for p in self._ports:
+            try:
+                addr = (self._host, p)
+                self._httpd = _BridgeHTTPServer(addr, BridgeHandler, self._signals)
+                self._port = p
+                self._address = addr
+                last_exc = None
+                break
+            except OSError as exc:
+                last_exc = exc
+                continue
+
+        if self._httpd is None:
+            if last_exc is not None:
+                raise last_exc
+            raise OSError(f"Could not bind to any candidate port: {self._ports}")
+
+        # Store active port in user runtime directory for diagnostics/CLI tools
+        try:
+            from pathlib import Path
+            appdata = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA") or str(Path.home())
+            cidm_dir = Path(appdata) / "CIDM"
+            cidm_dir.mkdir(parents=True, exist_ok=True)
+            port_file = cidm_dir / "bridge_port.json"
+            port_file.write_text(json.dumps({"port": self._port, "host": self._host}))
+        except Exception:
+            pass
+
         self._thread = threading.Thread(
             target=self._httpd.serve_forever, kwargs={"poll_interval": 0.25},
             name="cidm-bridge", daemon=True,

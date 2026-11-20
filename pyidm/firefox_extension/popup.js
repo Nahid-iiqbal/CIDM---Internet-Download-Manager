@@ -1,5 +1,23 @@
 // popup.js - CIDM Universal Download & Stream Detection Popup
-const BRIDGE = "http://127.0.0.1:9632";
+const CANDIDATE_PORTS = [9632, 19632, 29632, 39632, 9633, 9634];
+let activeBridgeUrl = `http://127.0.0.1:${CANDIDATE_PORTS[0]}`;
+
+async function getBridgeUrl() {
+  for (const port of CANDIDATE_PORTS) {
+    const candidate = `http://127.0.0.1:${port}`;
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 350);
+      const res = await fetch(`${candidate}/ping`, { signal: controller.signal, cache: "no-store" });
+      clearTimeout(timer);
+      if (res.ok) {
+        activeBridgeUrl = candidate;
+        return activeBridgeUrl;
+      }
+    } catch (_e) {}
+  }
+  return activeBridgeUrl;
+}
 const statusEl = document.getElementById("status");
 const toggle = document.getElementById("toggle");
 const quickUrlInput = document.getElementById("quick-url");
@@ -31,10 +49,19 @@ function setStatus(online) {
 }
 
 async function checkConnection() {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 1500);
   try {
-    const res = await fetch(`${BRIDGE}/ping`, { signal: controller.signal, cache: "no-store" });
+    const res = await chrome.runtime.sendMessage({ type: "isBridgeAlive" });
+    if (res && typeof res.alive === "boolean") {
+      setStatus(res.alive);
+      return;
+    }
+  } catch (_e) {}
+
+  const bridge = await getBridgeUrl();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 1000);
+  try {
+    const res = await fetch(`${bridge}/ping`, { signal: controller.signal, cache: "no-store" });
     const data = await res.json();
     setStatus(res.ok && data.status === "ok");
   } catch (_err) {

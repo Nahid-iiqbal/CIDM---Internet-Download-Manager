@@ -1,5 +1,67 @@
 // background.js - CIDM Universal Web Stream & Subtitle Sniffer & Desktop Bridge
-const BRIDGE = "http://127.0.0.1:9632";
+// Dynamic candidate bridge ports; automatically discovers active port if Windows NAT blocks 9632
+const CANDIDATE_PORTS = [9632, 19632, 29632, 39632, 9633, 9634];
+let activeBridgeUrl = `http://127.0.0.1:${CANDIDATE_PORTS[0]}`;
+let lastVerifiedBridgeTime = 0;
+
+if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+  chrome.storage.local.get(["activeBridgeUrl"]).then((data) => {
+    if (data && data.activeBridgeUrl) {
+      activeBridgeUrl = data.activeBridgeUrl;
+    }
+  }).catch(() => {});
+}
+
+function isBridgeUrl(url) {
+  if (!url) return false;
+  for (const port of CANDIDATE_PORTS) {
+    if (url.startsWith(`http://127.0.0.1:${port}`) || url.startsWith(`http://localhost:${port}`)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+async function getBridgeUrl(forceProbe = false) {
+  const now = Date.now();
+  if (!forceProbe && (now - lastVerifiedBridgeTime < 5000)) {
+    return activeBridgeUrl;
+  }
+
+  // Quick check against current activeBridgeUrl
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 400);
+    const res = await fetch(`${activeBridgeUrl}/ping`, { signal: controller.signal, cache: "no-store" });
+    clearTimeout(timer);
+    if (res.ok) {
+      lastVerifiedBridgeTime = now;
+      return activeBridgeUrl;
+    }
+  } catch (_e) {}
+
+  // Current port failed; probe candidate ports
+  for (const port of CANDIDATE_PORTS) {
+    const candidate = `http://127.0.0.1:${port}`;
+    if (candidate === activeBridgeUrl) continue;
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 400);
+      const res = await fetch(`${candidate}/ping`, { signal: controller.signal, cache: "no-store" });
+      clearTimeout(timer);
+      if (res.ok) {
+        activeBridgeUrl = candidate;
+        lastVerifiedBridgeTime = now;
+        if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+          chrome.storage.local.set({ activeBridgeUrl: candidate }).catch(() => {});
+        }
+        return activeBridgeUrl;
+      }
+    } catch (_e) {}
+  }
+
+  return activeBridgeUrl;
+}
 const handledIds = new Set();
 const bypassUrls = new Set();
 
@@ -75,10 +137,11 @@ chrome.runtime.onInstalled.addListener(async () => {
 });
 
 async function isDesktopAppRunning() {
+  const bridge = await getBridgeUrl();
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 1500);
+  const timer = setTimeout(() => controller.abort(), 1200);
   try {
-    const res = await fetch(`${BRIDGE}/ping`, { signal: controller.signal, cache: "no-store" });
+    const res = await fetch(`${bridge}/ping`, { signal: controller.signal, cache: "no-store" });
     if (!res.ok) return false;
     const data = await res.json();
     return data && data.status === "ok";
@@ -135,7 +198,8 @@ async function sendToDesktop(payload) {
   if (payload && payload.url) {
     payload.url = normalizeDownloadUrl(payload.url);
   }
-  const res = await fetch(`${BRIDGE}/add-download`, {
+  const bridge = await getBridgeUrl();
+  const res = await fetch(`${bridge}/add-download`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -256,7 +320,7 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
   async (details) => {
     const tabId = details.tabId;
     if (tabId < 0) return;
-    if (details.url.startsWith("http://127.0.0.1:9632")) return;
+    if (isBridgeUrl(details.url)) return;
 
     let referer = "";
     let origin = "";
@@ -539,7 +603,8 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         cookies = cookieHeader(await chrome.cookies.getAll({ url: tab.url }));
       } catch (_e) {}
 
-      await fetch(`${BRIDGE}/add-batch`, {
+      const bridge = await getBridgeUrl();
+      await fetch(`${bridge}/add-batch`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -619,6 +684,14 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 // ---------------------------------------------------------------------------
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg) return false;
+
+  if (msg.type === "isBridgeAlive") {
+    (async () => {
+      const alive = await isDesktopAppRunning();
+      sendResponse({ ok: true, alive, bridgeUrl: activeBridgeUrl });
+    })();
+    return true;
+  }
 
   // Retrieve detected streams for popup
   if (msg.type === "getDetectedStreams") {

@@ -1,7 +1,7 @@
 """main.py - Starts the local HTTP bridge and the PySide6 GUI."""
 from __future__ import annotations
 from ui import MainWindow, create_app_icon, load_settings
-from server import HOST, PORT, BridgeServer, BridgeSignals
+from server import HOST, PORT, DEFAULT_PORTS, BridgeServer, BridgeSignals
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication, QMessageBox
 
@@ -116,26 +116,50 @@ if sys.platform == "win32":
         pass
 
 
-def is_already_running() -> bool:
-    """Check if another CIDM instance is already running and listening on the bridge port."""
+def find_running_instance_port() -> int | None:
+    """Find which port (if any) an existing CIDM instance is actively listening on."""
+    # Fast path: check cached runtime bridge_port.json first
     try:
-        req = urllib.request.Request(
-            f"http://{HOST}:{PORT}/ping", method="GET")
-        with urllib.request.urlopen(req, timeout=1.0) as resp:
-            if resp.status == 200:
-                # Make sure it's really CIDM and not some other local service.
-                info = json.loads(resp.read(4096).decode("utf-8", "replace"))
-                return isinstance(info, dict) and info.get("app") == "CIDM"
+        appdata = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA") or str(Path.home())
+        p_file = Path(appdata) / "CIDM" / "bridge_port.json"
+        if p_file.is_file():
+            data = json.loads(p_file.read_text(encoding="utf-8"))
+            p = data.get("port")
+            if isinstance(p, int):
+                req = urllib.request.Request(f"http://{HOST}:{p}/ping", method="GET")
+                with urllib.request.urlopen(req, timeout=0.6) as resp:
+                    if resp.status == 200:
+                        info = json.loads(resp.read(4096).decode("utf-8", "replace"))
+                        if isinstance(info, dict) and info.get("app") == "CIDM":
+                            return p
     except Exception:
         pass
-    return False
+
+    # Probe all default/fallback candidate ports
+    for p in DEFAULT_PORTS:
+        try:
+            req = urllib.request.Request(f"http://{HOST}:{p}/ping", method="GET")
+            with urllib.request.urlopen(req, timeout=0.35) as resp:
+                if resp.status == 200:
+                    info = json.loads(resp.read(4096).decode("utf-8", "replace"))
+                    if isinstance(info, dict) and info.get("app") == "CIDM":
+                        return p
+        except Exception:
+            pass
+    return None
 
 
-def request_focus_existing() -> None:
+def is_already_running() -> int | None:
+    """Check if another CIDM instance is already running and listening on any bridge port."""
+    return find_running_instance_port()
+
+
+def request_focus_existing(port: int | None = None) -> None:
     """Ask the existing CIDM instance to restore its main window."""
+    target_port = port or find_running_instance_port() or PORT
     try:
         req = urllib.request.Request(
-            f"http://{HOST}:{PORT}/focus",
+            f"http://{HOST}:{target_port}/focus",
             data=b"{}",
             headers={"Content-Type": "application/json"},
             method="POST",
@@ -146,12 +170,13 @@ def request_focus_existing() -> None:
         pass
 
 
-def forward_url_to_running(url: str) -> bool:
+def forward_url_to_running(url: str, port: int | None = None) -> bool:
     """Forward a download URL from CLI to the already-running CIDM instance."""
+    target_port = port or find_running_instance_port() or PORT
     try:
         data = json.dumps({"url": url}).encode("utf-8")
         req = urllib.request.Request(
-            f"http://{HOST}:{PORT}/add-download",
+            f"http://{HOST}:{target_port}/add-download",
             data=data,
             headers={"Content-Type": "application/json"},
             method="POST",
@@ -165,21 +190,22 @@ def forward_url_to_running(url: str) -> bool:
 def main() -> int:
     # Single-instance guard: if an instance is already running, forward URLs or focus and exit
     if "--force" not in sys.argv and "--restart" not in sys.argv:
-        if is_already_running():
+        running_port = is_already_running()
+        if running_port is not None:
             url_args = [
                 arg for arg in sys.argv[1:]
                 if not arg.startswith("-") and (arg.startswith("http://") or arg.startswith("https://"))
             ]
             if url_args:
                 for u in url_args:
-                    forward_url_to_running(u)
-                request_focus_existing()
-                print(f"Forwarded {len(url_args)} download(s) to running CIDM instance.")
+                    forward_url_to_running(u, running_port)
+                request_focus_existing(running_port)
+                print(f"Forwarded {len(url_args)} download(s) to running CIDM instance on port {running_port}.")
                 return 0
             print(
-                "CIDM is already running in background/tray. Bringing window to focus...")
+                f"CIDM is already running in background/tray on port {running_port}. Bringing window to focus...")
             print("To force start a new instance, run: python main.py --force")
-            request_focus_existing()
+            request_focus_existing(running_port)
             return 0
 
     app = QApplication(sys.argv)
@@ -204,12 +230,13 @@ def main() -> int:
     server = BridgeServer(signals)
     try:
         server.start()
+        logging.info("CIDM bridge server listening on %s:%d", server.host, server.port)
     except OSError as exc:
         QMessageBox.warning(
             window,
             "Browser integration unavailable",
-            f"Could not listen on {HOST}:{PORT} ({exc}).\n\n"
-            "Another process may be using this port. "
+            f"Could not listen on any local bridge port ({exc}).\n\n"
+            "Another process or security policy may be blocking local socket access. "
             "CIDM will work, but browser downloads cannot be intercepted.",
         )
     app.aboutToQuit.connect(server.stop)
