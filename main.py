@@ -3,6 +3,7 @@ from __future__ import annotations
 from ui import MainWindow, create_app_icon, load_settings
 from server import HOST, PORT, DEFAULT_PORTS, BridgeServer, BridgeSignals
 from PySide6.QtCore import QTimer
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 import json
@@ -116,8 +117,8 @@ if sys.platform == "win32":
         pass
 
 
-def find_running_instance_port() -> int | None:
-    """Find which port (if any) an existing CIDM instance is actively listening on."""
+def get_running_bridge_info() -> tuple[int | None, str]:
+    """Return (port, token) for the currently running CIDM bridge instance."""
     # Fast path: check cached runtime bridge_port.json first
     try:
         appdata = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA") or str(Path.home())
@@ -125,13 +126,14 @@ def find_running_instance_port() -> int | None:
         if p_file.is_file():
             data = json.loads(p_file.read_text(encoding="utf-8"))
             p = data.get("port")
+            token = str(data.get("token") or "")
             if isinstance(p, int):
                 req = urllib.request.Request(f"http://{HOST}:{p}/ping", method="GET")
                 with urllib.request.urlopen(req, timeout=0.6) as resp:
                     if resp.status == 200:
                         info = json.loads(resp.read(4096).decode("utf-8", "replace"))
                         if isinstance(info, dict) and info.get("app") == "CIDM":
-                            return p
+                            return p, token
     except Exception:
         pass
 
@@ -143,10 +145,16 @@ def find_running_instance_port() -> int | None:
                 if resp.status == 200:
                     info = json.loads(resp.read(4096).decode("utf-8", "replace"))
                     if isinstance(info, dict) and info.get("app") == "CIDM":
-                        return p
+                        return p, ""
         except Exception:
             pass
-    return None
+    return None, ""
+
+
+def find_running_instance_port() -> int | None:
+    """Find which port (if any) an existing CIDM instance is actively listening on."""
+    port, _ = get_running_bridge_info()
+    return port
 
 
 def is_already_running() -> int | None:
@@ -156,12 +164,16 @@ def is_already_running() -> int | None:
 
 def request_focus_existing(port: int | None = None) -> None:
     """Ask the existing CIDM instance to restore its main window."""
-    target_port = port or find_running_instance_port() or PORT
+    target_port, token = get_running_bridge_info()
+    target_port = port or target_port or PORT
     try:
+        headers = {"Content-Type": "application/json"}
+        if token:
+            headers["X-CIDM-Token"] = token
         req = urllib.request.Request(
             f"http://{HOST}:{target_port}/focus",
             data=b"{}",
-            headers={"Content-Type": "application/json"},
+            headers=headers,
             method="POST",
         )
         with urllib.request.urlopen(req, timeout=1.5):
@@ -172,13 +184,17 @@ def request_focus_existing(port: int | None = None) -> None:
 
 def forward_url_to_running(url: str, port: int | None = None) -> bool:
     """Forward a download URL from CLI to the already-running CIDM instance."""
-    target_port = port or find_running_instance_port() or PORT
+    target_port, token = get_running_bridge_info()
+    target_port = port or target_port or PORT
     try:
         data = json.dumps({"url": url}).encode("utf-8")
+        headers = {"Content-Type": "application/json"}
+        if token:
+            headers["X-CIDM-Token"] = token
         req = urllib.request.Request(
             f"http://{HOST}:{target_port}/add-download",
             data=data,
-            headers={"Content-Type": "application/json"},
+            headers=headers,
             method="POST",
         )
         with urllib.request.urlopen(req, timeout=2.0) as resp:
@@ -211,6 +227,7 @@ def main() -> int:
     app = QApplication(sys.argv)
     app.setApplicationName("CIDM")
     app.setOrganizationName("CIDM")
+    app.setFont(QFont("Segoe UI", 9))
     # Keep the event loop running even when all windows are hidden into the tray
     app.setQuitOnLastWindowClosed(False)
 

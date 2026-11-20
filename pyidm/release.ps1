@@ -1,6 +1,6 @@
 # release.ps1 - One-Command Release Packaging Script for CIDM
 param(
-    [string]$Version = "1.0.1"
+    [string]$Version = "1.0.2"
 )
 
 $ErrorActionPreference = "Stop"
@@ -41,13 +41,13 @@ if (-not $Iscc) {
 # 1. Run build_app.py
 if ($Iscc) {
     Write-Host "[+] Inno Setup compiler found: $Iscc" -ForegroundColor Green
-    Write-Host "[*] Building PyInstaller distribution and Windows Installer..." -ForegroundColor Cyan
-    & $PythonExe build_app.py --installer
+    Write-Host "[*] Building PyInstaller distribution and Windows Installer for v$Version..." -ForegroundColor Cyan
+    & $PythonExe build_app.py --installer --version $Version
 } else {
     Write-Host "[!] Inno Setup (ISCC.exe) not found on PATH or standard locations." -ForegroundColor Yellow
     Write-Host "    To build CIDM_Setup.exe installer, install Inno Setup: winget install JRSoftware.InnoSetup" -ForegroundColor DarkGray
-    Write-Host "[*] Building portable distribution package only..." -ForegroundColor Cyan
-    & $PythonExe build_app.py
+    Write-Host "[*] Building portable distribution package only for v$Version..." -ForegroundColor Cyan
+    & $PythonExe build_app.py --version $Version
 }
 
 if ($LASTEXITCODE -ne 0) {

@@ -177,7 +177,44 @@ def find_inno_setup_compiler() -> Path | None:
     return None
 
 
-def run_inno_setup(base_dir: Path) -> int:
+def get_app_version(base_dir: Path) -> str:
+    """Read APP_VERSION from updater.py as the single source of truth."""
+    updater_file = base_dir / "updater.py"
+    if updater_file.exists():
+        import re
+        m = re.search(r'APP_VERSION\s*=\s*["\']([^"\']+)["\']', updater_file.read_text(encoding="utf-8"))
+        if m:
+            return m.group(1).strip()
+    return "1.0.2"
+
+
+def sync_version_across_project(base_dir: Path, version: str) -> None:
+    """Synchronize application version into updater.py, installer.iss, and pyidm."""
+    import re
+    # 1. Update updater.py
+    for u_path in (base_dir / "updater.py", base_dir / "pyidm" / "updater.py"):
+        if u_path.exists():
+            content = u_path.read_text(encoding="utf-8")
+            updated = re.sub(r'APP_VERSION\s*=\s*["\'][^"\']+["\']', f'APP_VERSION = "{version}"', content)
+            if updated != content:
+                u_path.write_text(updated, encoding="utf-8")
+                print(f"[*] Updated {u_path.name} APP_VERSION -> {version}")
+
+    # 2. Update installer.iss
+    for iss in (base_dir / "installer.iss", base_dir / "pyidm" / "installer.iss"):
+        if iss.exists():
+            content = iss.read_text(encoding="utf-8")
+            updated = re.sub(
+                r'(#define\s+MyAppVersion\s+)["\'][^"\']+["\']',
+                rf'\1"{version}"',
+                content,
+            )
+            if updated != content:
+                iss.write_text(updated, encoding="utf-8")
+                print(f"[*] Updated {iss.name} MyAppVersion -> {version}")
+
+
+def run_inno_setup(base_dir: Path, version: str | None = None) -> int:
     iscc = find_inno_setup_compiler()
     iss_file = base_dir / "installer.iss"
 
@@ -192,12 +229,14 @@ def run_inno_setup(base_dir: Path) -> int:
         print(f"    Then compile manually: ISCC.exe {iss_file}")
         return 1
 
-    print(f"\n[*] Compiling installer using {iscc}...")
-    res = subprocess.run([str(iscc), str(iss_file)])
+    app_version = version or get_app_version(base_dir)
+    print(f"\n[*] Compiling installer using {iscc} for version v{app_version}...")
+    cmd = [str(iscc), f"/DMyAppVersion={app_version}", str(iss_file)]
+    res = subprocess.run(cmd)
     if res.returncode == 0:
         out_setup = base_dir / "Output" / "CIDM_Setup.exe"
         print("\n" + "=" * 65)
-        print("[+] Windows Installer compiled successfully:")
+        print(f"[+] Windows Installer (v{app_version}) compiled successfully:")
         print(f"    {out_setup}")
         print("=" * 65)
     return res.returncode
@@ -207,8 +246,11 @@ def build(
     onedir: bool = True,
     clean: bool = True,
     compile_installer: bool = False,
+    version: str | None = None,
 ) -> int:
     base_dir = get_base_dir()
+    app_version = version or get_app_version(base_dir)
+    sync_version_across_project(base_dir, app_version)
 
     if clean:
         clean_build_artifacts(base_dir)
@@ -339,7 +381,7 @@ def build(
     print("=" * 65)
 
     if compile_installer:
-        return run_inno_setup(base_dir)
+        return run_inno_setup(base_dir, app_version)
 
     return 0
 
@@ -363,12 +405,19 @@ def main() -> int:
         action="store_true",
         help="Automatically compile CIDM_Setup.exe using Inno Setup (ISCC.exe) after PyInstaller finishes.",
     )
+    parser.add_argument(
+        "--version",
+        type=str,
+        default=None,
+        help="Specify application version number (defaults to APP_VERSION from updater.py).",
+    )
 
     args = parser.parse_args()
     return build(
         onedir=not args.onefile,
         clean=not args.no_clean,
         compile_installer=args.installer,
+        version=args.version,
     )
 
 

@@ -2,7 +2,9 @@
 ; Builds a clean installer (CIDM_Setup.exe) from dist\CIDM
 
 #define MyAppName "CIDM"
-#define MyAppVersion "1.0.2"
+#ifndef MyAppVersion
+#define MyAppVersion "1.0.3"
+#endif
 #define MyAppPublisher "CIDM Team"
 #define MyAppURL "https://github.com/cidm"
 #define MyAppExeName "CIDM.exe"
@@ -13,10 +15,21 @@
 AppId={{9B7E34B5-7F16-43C6-9BC5-9A91D6EB0842}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
+AppVerName={#MyAppName} v{#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
+
+; Embedded Windows PE File Version Metadata for CIDM_Setup.exe
+VersionInfoVersion={#MyAppVersion}
+VersionInfoTextVersion={#MyAppVersion}
+VersionInfoCompany={#MyAppPublisher}
+VersionInfoDescription={#MyAppName} Setup
+VersionInfoCopyright=Copyright (C) 2026 CIDM Team
+VersionInfoProductName={#MyAppName}
+VersionInfoProductVersion={#MyAppVersion}
+VersionInfoProductTextVersion={#MyAppVersion}
 
 ; Installation target directory and Start Menu group (auto-detects existing installation folder)
 DefaultDirName={code:GetInstallDir|{autopf}\{#MyAppName}}

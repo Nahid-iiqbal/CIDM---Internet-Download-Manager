@@ -14,12 +14,52 @@ if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
 
 function isBridgeUrl(url) {
   if (!url) return false;
-  for (const port of CANDIDATE_PORTS) {
-    if (url.startsWith(`http://127.0.0.1:${port}`) || url.startsWith(`http://localhost:${port}`)) {
-      return true;
+  try {
+    const u = new URL(url);
+    if (u.hostname === "127.0.0.1" || u.hostname === "localhost") {
+      const port = u.port ? Number(u.port) : (u.protocol === "https:" ? 443 : 80);
+      return CANDIDATE_PORTS.includes(port);
     }
-  }
+  } catch (_e) {}
   return false;
+}
+
+let bridgeToken = "";
+
+async function loadBridgeToken() {
+  if (bridgeToken) return bridgeToken;
+  try {
+    const res = await fetch(chrome.runtime.getURL("bridge_config.json"));
+    if (res.ok) {
+      const cfg = await res.json();
+      if (cfg && cfg.token) {
+        bridgeToken = cfg.token;
+        if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+          chrome.storage.local.set({ bridgeToken }).catch(() => {});
+        }
+        return bridgeToken;
+      }
+    }
+  } catch (_e) {}
+  if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+    try {
+      const data = await chrome.storage.local.get("bridgeToken");
+      if (data && data.bridgeToken) {
+        bridgeToken = data.bridgeToken;
+        return bridgeToken;
+      }
+    } catch (_e) {}
+  }
+  return "";
+}
+
+async function getAuthHeaders() {
+  const token = await loadBridgeToken();
+  const headers = { "Content-Type": "application/json" };
+  if (token) {
+    headers["X-CIDM-Token"] = token;
+  }
+  return headers;
 }
 
 async function getBridgeUrl(forceProbe = false) {
@@ -31,36 +71,47 @@ async function getBridgeUrl(forceProbe = false) {
   // Quick check against current activeBridgeUrl
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 400);
+    const timer = setTimeout(() => controller.abort(), 350);
     const res = await fetch(`${activeBridgeUrl}/ping`, { signal: controller.signal, cache: "no-store" });
     clearTimeout(timer);
     if (res.ok) {
-      lastVerifiedBridgeTime = now;
-      return activeBridgeUrl;
+      const data = await res.json().catch(() => null);
+      if (data && data.status === "ok" && data.app === "CIDM") {
+        lastVerifiedBridgeTime = now;
+        return activeBridgeUrl;
+      }
     }
   } catch (_e) {}
 
-  // Current port failed; probe candidate ports
-  for (const port of CANDIDATE_PORTS) {
+  // Current port failed; probe all candidate ports in parallel
+  const checkPort = async (port) => {
     const candidate = `http://127.0.0.1:${port}`;
-    if (candidate === activeBridgeUrl) continue;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 600);
     try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 400);
       const res = await fetch(`${candidate}/ping`, { signal: controller.signal, cache: "no-store" });
       clearTimeout(timer);
       if (res.ok) {
-        activeBridgeUrl = candidate;
-        lastVerifiedBridgeTime = now;
-        if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-          chrome.storage.local.set({ activeBridgeUrl: candidate }).catch(() => {});
-        }
-        return activeBridgeUrl;
+        const data = await res.json().catch(() => null);
+        if (data && data.status === "ok" && data.app === "CIDM") return candidate;
       }
-    } catch (_e) {}
-  }
+    } catch (_e) {
+      clearTimeout(timer);
+    }
+    throw new Error("offline");
+  };
 
-  return activeBridgeUrl;
+  try {
+    const winning = await Promise.any(CANDIDATE_PORTS.map(checkPort));
+    activeBridgeUrl = winning;
+    lastVerifiedBridgeTime = now;
+    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+      chrome.storage.local.set({ activeBridgeUrl: winning }).catch(() => {});
+    }
+    return activeBridgeUrl;
+  } catch (_e) {
+    return activeBridgeUrl;
+  }
 }
 const handledIds = new Set();
 const bypassUrls = new Set();
@@ -143,8 +194,8 @@ async function isDesktopAppRunning() {
   try {
     const res = await fetch(`${bridge}/ping`, { signal: controller.signal, cache: "no-store" });
     if (!res.ok) return false;
-    const data = await res.json();
-    return data && data.status === "ok";
+    const data = await res.json().catch(() => null);
+    return data && data.status === "ok" && data.app === "CIDM";
   } catch (_err) {
     return false;
   } finally {
@@ -199,9 +250,10 @@ async function sendToDesktop(payload) {
     payload.url = normalizeDownloadUrl(payload.url);
   }
   const bridge = await getBridgeUrl();
+  const headers = await getAuthHeaders();
   const res = await fetch(`${bridge}/add-download`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error(`Desktop app returned HTTP ${res.status}`);
@@ -604,9 +656,10 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       } catch (_e) {}
 
       const bridge = await getBridgeUrl();
+      const headers = await getAuthHeaders();
       await fetch(`${bridge}/add-batch`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           urls: extractedUrls,
           referer: tab.url || "",

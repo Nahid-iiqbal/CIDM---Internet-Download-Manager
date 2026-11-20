@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
@@ -40,9 +41,10 @@ class _BridgeHTTPServer(ThreadingHTTPServer):
     # On Windows SO_REUSEADDR would let a second instance bind the same port.
     allow_reuse_address = os.name != "nt"
 
-    def __init__(self, address, handler, signals: BridgeSignals):
+    def __init__(self, address, handler, signals: BridgeSignals, token: str = ""):
         super().__init__(address, handler)
         self.signals = signals
+        self.token = token
 
 
 class BridgeHandler(BaseHTTPRequestHandler):
@@ -55,19 +57,26 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
     # ----- helpers ---------------------------------------------------------- #
     def _cors_headers(self) -> None:
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
-        self.send_header("Access-Control-Allow-Private-Network", "true")
-        self.send_header("Access-Control-Max-Age", "600")
+        origin = self.headers.get("Origin")
+        if origin and origin.startswith(("chrome-extension://", "moz-extension://", "extension://", "safari-web-extension://")):
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Vary", "Origin")
+            self.send_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type, X-CIDM-Token")
+            self.send_header("Access-Control-Allow-Private-Network", "true")
+            self.send_header("Access-Control-Max-Age", "600")
 
     def _send_json(self, code: int, obj: dict) -> None:
+        if code >= 400:
+            self.close_connection = True
         body = json.dumps(obj).encode("utf-8")
         self.send_response(code)
         self._cors_headers()
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        if code >= 400:
+            self.send_header("Connection", "close")
         self.end_headers()
         try:
             self.wfile.write(body)
@@ -82,6 +91,12 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
     # ----- verbs ------------------------------------------------------------ #
     def do_OPTIONS(self):
+        origin = self.headers.get("Origin")
+        if origin and not origin.startswith(("chrome-extension://", "moz-extension://", "extension://", "safari-web-extension://")):
+            self.send_response(403)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
         self.send_response(204)
         self._cors_headers()
         self.send_header("Content-Length", "0")
@@ -90,6 +105,9 @@ class BridgeHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if not self._host_ok():
             return self._send_json(403, {"status": "error", "message": "bad host"})
+        origin = self.headers.get("Origin")
+        if origin and not origin.startswith(("chrome-extension://", "moz-extension://", "extension://", "safari-web-extension://")):
+            return self._send_json(403, {"status": "error", "message": "origin not allowed"})
         if urlparse(self.path).path == "/ping":
             return self._send_json(200, {"status": "ok", "app": APP_ID})
         self._send_json(404, {"status": "error", "message": "not found"})
@@ -100,6 +118,18 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
         req_path = urlparse(self.path).path
         origin = self.headers.get("Origin")
+
+        # Non-browser clients (empty origin) and trusted browser extensions are permitted.
+        # Arbitrary web pages cannot trigger actions via CORS.
+        if origin and not origin.startswith(("chrome-extension://", "moz-extension://", "extension://", "safari-web-extension://")):
+            return self._send_json(403, {"status": "error", "message": "origin not allowed"})
+
+        # Token authentication check
+        expected_token = getattr(self.server, "token", "")
+        if expected_token:
+            token = self.headers.get("X-CIDM-Token", "").strip()
+            if not token or not secrets.compare_digest(token, expected_token):
+                return self._send_json(401, {"status": "error", "message": "unauthorized"})
 
         if req_path == "/focus":
             if hasattr(self.server, "signals") and self.server.signals:
@@ -113,9 +143,6 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 self.server.signals.quit_requested.emit()
             return self._send_json(200, {"status": "ok", "message": "quitting"})
 
-        # Only the browser extension (or non-browser clients such as curl) may queue downloads.
-        if origin and not origin.startswith(("chrome-extension://", "moz-extension://", "extension://", "safari-web-extension://")):
-            return self._send_json(403, {"status": "error", "message": "origin not allowed"})
         if req_path not in ("/add-download", "/add-batch"):
             return self._send_json(404, {"status": "error", "message": "not found"})
 
@@ -196,9 +223,10 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
 
 class BridgeServer:
-    def __init__(self, signals: BridgeSignals, host: str = HOST, ports: list[int] | tuple[int, ...] | int | None = None):
+    def __init__(self, signals: BridgeSignals, host: str = HOST, ports: list[int] | tuple[int, ...] | int | None = None, token: str = ""):
         self._signals = signals
         self._host = host
+        self._token = token or secrets.token_hex(32)
         if ports is None:
             self._ports = list(DEFAULT_PORTS)
         elif isinstance(ports, int):
@@ -209,6 +237,10 @@ class BridgeServer:
         self._address = (self._host, self._port)
         self._httpd = None
         self._thread = None
+
+    @property
+    def token(self) -> str:
+        return self._token
 
     @property
     def host(self) -> str:
@@ -228,7 +260,7 @@ class BridgeServer:
         for p in self._ports:
             try:
                 addr = (self._host, p)
-                self._httpd = _BridgeHTTPServer(addr, BridgeHandler, self._signals)
+                self._httpd = _BridgeHTTPServer(addr, BridgeHandler, self._signals, token=self._token)
                 self._port = p
                 self._address = addr
                 last_exc = None
@@ -242,14 +274,24 @@ class BridgeServer:
                 raise last_exc
             raise OSError(f"Could not bind to any candidate port: {self._ports}")
 
-        # Store active port in user runtime directory for diagnostics/CLI tools
+        # Store active port and token in user runtime directory for diagnostics/CLI tools
         try:
             from pathlib import Path
             appdata = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA") or str(Path.home())
             cidm_dir = Path(appdata) / "CIDM"
             cidm_dir.mkdir(parents=True, exist_ok=True)
             port_file = cidm_dir / "bridge_port.json"
-            port_file.write_text(json.dumps({"port": self._port, "host": self._host}))
+            port_file.write_text(json.dumps({"port": self._port, "host": self._host, "token": self._token}))
+
+            # Also sync token to extension directories so unpacked extension pairs seamlessly
+            cfg_data = json.dumps({"token": self._token, "port": self._port})
+            for sub in ("chromium", "firefox"):
+                ext_dir = Path.home() / ".cidm" / "extension" / sub
+                if ext_dir.is_dir():
+                    (ext_dir / "bridge_config.json").write_text(cfg_data)
+            legacy_ext = Path.home() / ".cidm" / "extension"
+            if legacy_ext.is_dir():
+                (legacy_ext / "bridge_config.json").write_text(cfg_data)
         except Exception:
             pass
 
@@ -264,3 +306,13 @@ class BridgeServer:
             self._httpd.shutdown()
             self._httpd.server_close()
             self._httpd = None
+
+        # Clean up runtime port file on shutdown
+        try:
+            from pathlib import Path
+            appdata = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA") or str(Path.home())
+            port_file = Path(appdata) / "CIDM" / "bridge_port.json"
+            if port_file.is_file():
+                port_file.unlink(missing_ok=True)
+        except Exception:
+            pass

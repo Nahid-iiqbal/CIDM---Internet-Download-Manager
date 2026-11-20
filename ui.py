@@ -140,9 +140,9 @@ if not os.path.exists(SETTINGS_PATH) and os.path.exists(_LEGACY_SETTINGS):
 # Stylesheets (Neutral Charcoal / Slate Grey & Clean Light)
 # --------------------------------------------------------------------------- #
 DARK_GREY_QSS = """
-* {
+QWidget {
     font-family: "Segoe UI", "Inter", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
-    font-size: 12px;
+    font-size: 9pt;
     color: #e6e8ec;
 }
 QMainWindow, QDialog, QWidget#centralWrapper {
@@ -167,7 +167,7 @@ QToolButton {
     border: 1px solid transparent;
     border-radius: 5px;
     padding: 4px 6px;
-    font-size: 12px;
+    font-size: 9pt;
     font-weight: 500;
 }
 QToolButton:hover {
@@ -185,7 +185,7 @@ QToolButton#primaryAddBtn {
     background-color: #4f86c6;
     color: #ffffff;
     font-weight: 600;
-    font-size: 12px;
+    font-size: 9pt;
     border: 1px solid #5f96d6;
     border-radius: 5px;
     padding: 4px 9px;
@@ -203,7 +203,7 @@ QLineEdit#navSearchEdit {
     border: 1px solid #33373e;
     border-radius: 12px;
     padding: 3px 9px;
-    font-size: 11px;
+    font-size: 8.5pt;
     selection-background-color: #4f86c6;
 }
 QLineEdit#navSearchEdit:focus {
@@ -216,7 +216,7 @@ QPushButton#speedLimiterBtn {
     border: 1px solid #33373e;
     border-radius: 11px;
     padding: 3px 9px;
-    font-size: 11px;
+    font-size: 8.5pt;
     font-weight: 500;
 }
 QPushButton#speedLimiterBtn:hover {
@@ -234,7 +234,7 @@ QSpinBox#threadSpin {
     background: transparent;
     border: none;
     color: #e6e8ec;
-    font-size: 11px;
+    font-size: 8.5pt;
     font-weight: 500;
     padding: 2px 1px;
 }
@@ -246,7 +246,7 @@ QStatusBar {
     color: #9aa0aa;
     border-top: 1px solid #33373e;
     padding: 2px 10px;
-    font-size: 11px;
+    font-size: 8.5pt;
 }
 QStatusBar::item {
     border: none;
@@ -263,7 +263,7 @@ QListWidget#sidebar::item {
     padding: 6px 8px;
     border-radius: 5px;
     margin: 1px 0px;
-    font-size: 12px;
+    font-size: 9pt;
     font-weight: 500;
 }
 QListWidget#sidebar::item:hover {
@@ -289,7 +289,7 @@ QTableWidget::item {
     padding: 3px 8px;
     border: none;
     color: #e6e8ec;
-    font-size: 12px;
+    font-size: 9pt;
 }
 QTableWidget::item:hover {
     background-color: #262930;
@@ -305,7 +305,7 @@ QHeaderView::section {
     border-right: 1px solid #2d3138;
     border-bottom: 1px solid #33373e;
     padding: 6px 10px;
-    font-size: 11px;
+    font-size: 8.5pt;
     font-weight: 600;
 }
 QLineEdit, QSpinBox, QComboBox, QTimeEdit, QTextEdit {
@@ -314,7 +314,7 @@ QLineEdit, QSpinBox, QComboBox, QTimeEdit, QTextEdit {
     border: 1px solid #33373e;
     border-radius: 5px;
     padding: 5px 8px;
-    font-size: 12px;
+    font-size: 9pt;
     selection-background-color: #4f86c6;
 }
 QLineEdit:focus, QSpinBox:focus, QComboBox:focus, QTimeEdit:focus, QTextEdit:focus {
@@ -343,7 +343,7 @@ QPushButton {
     border: 1px solid #33373e;
     border-radius: 5px;
     padding: 5px 12px;
-    font-size: 12px;
+    font-size: 9pt;
     font-weight: 500;
 }
 QPushButton:hover {
@@ -372,7 +372,7 @@ QProgressBar {
     color: #ffffff;
     min-height: 14px;
     max-height: 16px;
-    font-size: 10px;
+    font-size: 8pt;
     font-weight: 600;
 }
 QProgressBar::chunk {
@@ -400,7 +400,7 @@ QGroupBox::title {
     left: 10px;
     padding: 0 6px;
     color: #9aa0aa;
-    font-size: 11px;
+    font-size: 8.5pt;
     font-weight: 600;
 }
 QTabWidget::pane {
@@ -414,7 +414,7 @@ QTabBar::tab {
     border: 1px solid #33373e;
     border-bottom: none;
     padding: 6px 14px;
-    font-size: 12px;
+    font-size: 9pt;
     border-top-left-radius: 5px;
     border-top-right-radius: 5px;
     margin-right: 2px;
@@ -522,9 +522,9 @@ QCheckBox::indicator:checked {
 """
 
 LIGHT_QSS = """
-* {
+QWidget {
     font-family: "Segoe UI", "Inter", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
-    font-size: 12px;
+    font-size: 9pt;
     color: #1f2937;
 }
 QMainWindow, QDialog, QWidget#centralWrapper {
@@ -549,7 +549,7 @@ QToolButton {
     border: 1px solid transparent;
     border-radius: 5px;
     padding: 4px 6px;
-    font-size: 12px;
+    font-size: 9pt;
     font-weight: 500;
 }
 QToolButton:hover {
@@ -567,7 +567,7 @@ QToolButton#primaryAddBtn {
     background-color: #2563eb;
     color: #ffffff;
     font-weight: 600;
-    font-size: 12px;
+    font-size: 9pt;
     border: 1px solid #1d4ed8;
     border-radius: 5px;
     padding: 4px 9px;
@@ -585,7 +585,7 @@ QLineEdit#navSearchEdit {
     border: 1px solid #cbd5e1;
     border-radius: 12px;
     padding: 3px 9px;
-    font-size: 11px;
+    font-size: 8.5pt;
     selection-background-color: #2563eb;
 }
 QLineEdit#navSearchEdit:focus {
@@ -598,7 +598,7 @@ QPushButton#speedLimiterBtn {
     border: 1px solid #cbd5e1;
     border-radius: 11px;
     padding: 3px 9px;
-    font-size: 11px;
+    font-size: 8.5pt;
     font-weight: 500;
 }
 QPushButton#speedLimiterBtn:hover {
@@ -616,7 +616,7 @@ QSpinBox#threadSpin {
     background: transparent;
     border: none;
     color: #1e293b;
-    font-size: 11px;
+    font-size: 8.5pt;
     font-weight: 500;
     padding: 2px 1px;
 }
@@ -628,7 +628,7 @@ QStatusBar {
     color: #4b5563;
     border-top: 1px solid #e5e7eb;
     padding: 2px 10px;
-    font-size: 11px;
+    font-size: 8.5pt;
 }
 QStatusBar::item {
     border: none;
@@ -645,7 +645,7 @@ QListWidget#sidebar::item {
     padding: 6px 8px;
     border-radius: 5px;
     margin: 1px 0px;
-    font-size: 12px;
+    font-size: 9pt;
     font-weight: 500;
 }
 QListWidget#sidebar::item:hover {
@@ -671,7 +671,7 @@ QTableWidget::item {
     padding: 3px 8px;
     border: none;
     color: #1f2937;
-    font-size: 12px;
+    font-size: 9pt;
 }
 QTableWidget::item:hover {
     background-color: #f3f4f6;
@@ -687,7 +687,7 @@ QHeaderView::section {
     border-right: 1px solid #e5e7eb;
     border-bottom: 1px solid #e5e7eb;
     padding: 6px 10px;
-    font-size: 11px;
+    font-size: 8.5pt;
     font-weight: 600;
 }
 QLineEdit, QSpinBox, QComboBox, QTimeEdit, QTextEdit {
@@ -696,7 +696,7 @@ QLineEdit, QSpinBox, QComboBox, QTimeEdit, QTextEdit {
     border: 1px solid #d1d5db;
     border-radius: 5px;
     padding: 5px 8px;
-    font-size: 12px;
+    font-size: 9pt;
     selection-background-color: #2563eb;
 }
 QLineEdit:focus, QSpinBox:focus, QComboBox:focus, QTimeEdit:focus, QTextEdit:focus {
@@ -725,7 +725,7 @@ QPushButton {
     border: 1px solid #d1d5db;
     border-radius: 5px;
     padding: 5px 12px;
-    font-size: 12px;
+    font-size: 9pt;
     font-weight: 500;
 }
 QPushButton:hover {
@@ -754,7 +754,7 @@ QProgressBar {
     color: #111827;
     min-height: 14px;
     max-height: 16px;
-    font-size: 10px;
+    font-size: 8pt;
     font-weight: 600;
 }
 QProgressBar::chunk {
@@ -788,7 +788,7 @@ QGroupBox::title {
     left: 10px;
     padding: 0 6px;
     color: #4b5563;
-    font-size: 11px;
+    font-size: 8.5pt;
     font-weight: 600;
 }
 QTabWidget::pane {
@@ -802,7 +802,7 @@ QTabBar::tab {
     border: 1px solid #e5e7eb;
     border-bottom: none;
     padding: 6px 14px;
-    font-size: 12px;
+    font-size: 9pt;
     border-top-left-radius: 5px;
     border-top-right-radius: 5px;
     margin-right: 2px;
@@ -969,7 +969,8 @@ def make_vector_icon(kind: str, color: str = "#e6e8ec", size: int = 18) -> QIcon
             p.drawLine(0, int(-s / 2.0 + 2.0), 0, int(-s / 2.0 + 4.0))
             p.restore()
     elif kind in ("update", "sync"):
-        p.drawArc(QRectF(3.5, 3.5, s - 7.0, s - 7.0), int(45 * 16), int(270 * 16))
+        p.drawArc(QRectF(3.5, 3.5, s - 7.0, s - 7.0),
+                  int(45 * 16), int(270 * 16))
         p.drawLine(int(s - 3.5), int(s / 2), int(s - 7.0), int(s / 2 - 3.5))
         p.drawLine(int(s - 3.5), int(s / 2), int(s - 0.5), int(s / 2 - 3.5))
     elif kind == "search":
@@ -1049,6 +1050,10 @@ DEFAULT_SETTINGS = {
     "notify_on_complete": True,
     "run_on_startup": False,
     "save_dir": "",
+    "watch_folder_enabled": False,
+    "watch_folder_path": "",
+    "watch_folder_autostart": True,
+    "watch_folder_delete_file": False,
     "auto_categorize": True,
     "threads": 8,
     "max_concurrent_downloads": 3,
@@ -1307,7 +1312,8 @@ def sync_extension_files(browser_type: str = "all") -> str:
 
             # For chromium, also maintain legacy root directory ~/.cidm/extension
             if "chromium" in b_type.lower() or "chrome" in b_type.lower():
-                legacy_dst = os.path.join(os.path.expanduser("~"), ".cidm", "extension")
+                legacy_dst = os.path.join(
+                    os.path.expanduser("~"), ".cidm", "extension")
                 os.makedirs(legacy_dst, exist_ok=True)
                 for item in os.listdir(src):
                     s_item = os.path.join(src, item)
@@ -1317,12 +1323,53 @@ def sync_extension_files(browser_type: str = "all") -> str:
                     else:
                         shutil.copy2(s_item, d_item)
 
+            # Write bridge_config.json with auth token if available
+            try:
+                from pathlib import Path
+                appdata = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA") or str(Path.home())
+                port_file = Path(appdata) / "CIDM" / "bridge_port.json"
+                if port_file.is_file():
+                    p_info = json.loads(port_file.read_text(encoding="utf-8"))
+                    cfg_text = json.dumps({"token": p_info.get("token", ""), "port": p_info.get("port", 9632)})
+                    (Path(dst) / "bridge_config.json").write_text(cfg_text, encoding="utf-8")
+                    if "chromium" in b_type.lower() or "chrome" in b_type.lower():
+                        legacy_cfg = Path(os.path.expanduser("~")) / ".cidm" / "extension" / "bridge_config.json"
+                        legacy_cfg.write_text(cfg_text, encoding="utf-8")
+            except Exception:
+                pass
+
             if not ret_dir or b_type == browser_type:
                 ret_dir = dst
         except Exception:
             if not ret_dir:
                 ret_dir = dst if os.path.isdir(dst) else src
     return ret_dir or get_installed_extension_dir(browser_type)
+
+
+def test_bridge_connection() -> tuple[bool, str]:
+    """Test whether the local CIDM HTTP bridge server is actively running and responding."""
+    try:
+        from pathlib import Path
+        import urllib.request
+        appdata = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA") or str(Path.home())
+        port_file = Path(appdata) / "CIDM" / "bridge_port.json"
+        port = 9632
+        token = ""
+        if port_file.is_file():
+            data = json.loads(port_file.read_text(encoding="utf-8"))
+            port = int(data.get("port") or 9632)
+            token = str(data.get("token") or "")
+
+        req = urllib.request.Request(f"http://127.0.0.1:{port}/ping", method="GET")
+        with urllib.request.urlopen(req, timeout=1.0) as resp:
+            if resp.status == 200:
+                info = json.loads(resp.read(4096).decode("utf-8", "replace"))
+                if isinstance(info, dict) and info.get("app") == "CIDM":
+                    token_str = "token paired" if token else "ready"
+                    return True, f"Connected to CIDM Bridge on port {port} ({token_str})."
+        return False, f"Bridge did not reply on port {port}."
+    except Exception as e:
+        return False, f"Bridge connection test failed: {e}"
 
 
 def register_extension_in_registry(ext_dir: str, browser_type: str = "chromium") -> None:
@@ -1357,8 +1404,10 @@ def register_extension_in_registry(ext_dir: str, browser_type: str = "chromium")
             for subkey in targets:
                 try:
                     key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, subkey)
-                    winreg.SetValueEx(key, "path", 0, winreg.REG_SZ, manifest_path)
-                    winreg.SetValueEx(key, "version", 0, winreg.REG_SZ, "2.1.0")
+                    winreg.SetValueEx(
+                        key, "path", 0, winreg.REG_SZ, manifest_path)
+                    winreg.SetValueEx(key, "version", 0,
+                                      winreg.REG_SZ, "2.1.0")
                     winreg.CloseKey(key)
                 except Exception:
                     pass
@@ -1368,7 +1417,8 @@ def register_extension_in_registry(ext_dir: str, browser_type: str = "chromium")
 
 def open_extension_folder(ext_dir: str = "", browser_type: str = "chromium") -> None:
     """Open the extension folder in File Explorer."""
-    path = ext_dir or sync_extension_files(browser_type) or get_installed_extension_dir(browser_type)
+    path = ext_dir or sync_extension_files(
+        browser_type) or get_installed_extension_dir(browser_type)
     if not os.path.exists(path):
         try:
             os.makedirs(path, exist_ok=True)
@@ -1603,13 +1653,14 @@ class ExtensionInstallGuideDialog(QDialog):
         title_box = QVBoxLayout()
         title_box.setSpacing(3)
         lbl_title = QLabel(f"Complete CIDM Integration with {browser_name}")
-        lbl_title.setStyleSheet("font-size: 15px; font-weight: bold; color: #4f86c6;")
+        lbl_title.setStyleSheet(
+            "font-size: 11.5pt; font-weight: bold; color: #4f86c6;")
         lbl_sub = QLabel(
             "Browser opened! Follow these 3 quick steps to activate:"
             if launched
             else "Follow these 3 quick steps in your browser:"
         )
-        lbl_sub.setStyleSheet("font-size: 12px; color: #9aa0aa;")
+        lbl_sub.setStyleSheet("font-size: 9pt; color: #9aa0aa;")
         title_box.addWidget(lbl_title)
         title_box.addWidget(lbl_sub)
         header.addLayout(title_box, 1)
@@ -1624,7 +1675,7 @@ class ExtensionInstallGuideDialog(QDialog):
                 "<b>Step 1:</b> Firefox will open <b>about:debugging#/runtime/this-firefox</b> "
                 "(or type that address into Firefox's URL bar)."
             )
-            s1.setStyleSheet("font-size: 12px; line-height: 1.4;")
+            s1.setStyleSheet("font-size: 9pt; line-height: 1.4;")
             s1.setWordWrap(True)
             steps_lay.addWidget(s1)
 
@@ -1632,7 +1683,7 @@ class ExtensionInstallGuideDialog(QDialog):
                 "<b>Step 2:</b> Under <b>Temporary Extensions</b>, click the "
                 "<b>'Load Temporary Add-on...'</b> button."
             )
-            s2.setStyleSheet("font-size: 12px; line-height: 1.4;")
+            s2.setStyleSheet("font-size: 9pt; line-height: 1.4;")
             s2.setWordWrap(True)
             steps_lay.addWidget(s2)
 
@@ -1640,26 +1691,29 @@ class ExtensionInstallGuideDialog(QDialog):
                 "<b>Step 3:</b> The path to <b>manifest.json</b> is <b>already copied to your clipboard</b>! "
                 "Press <b>Ctrl+V</b> into the File Name box and click <b>'Open'</b>."
             )
-            s3.setStyleSheet("font-size: 12px; line-height: 1.4; color: #57ab5a;")
+            s3.setStyleSheet(
+                "font-size: 9pt; line-height: 1.4; color: #57ab5a;")
             s3.setWordWrap(True)
             steps_lay.addWidget(s3)
         else:
             s1 = QLabel(
                 "<b>Step 1:</b> In the browser Extensions tab, turn <b>ON</b> the <b>'Developer mode'</b> switch (usually at top-right corner)."
             )
-            s1.setStyleSheet("font-size: 12px; line-height: 1.4;")
+            s1.setStyleSheet("font-size: 9pt; line-height: 1.4;")
             s1.setWordWrap(True)
             steps_lay.addWidget(s1)
 
-            s2 = QLabel("<b>Step 2:</b> Click the <b>'Load unpacked'</b> button (top-left).")
-            s2.setStyleSheet("font-size: 12px; line-height: 1.4;")
+            s2 = QLabel(
+                "<b>Step 2:</b> Click the <b>'Load unpacked'</b> button (top-left).")
+            s2.setStyleSheet("font-size: 9pt; line-height: 1.4;")
             s2.setWordWrap(True)
             steps_lay.addWidget(s2)
 
             s3 = QLabel(
                 "<b>Step 3:</b> The extension folder path is <b>already copied to your clipboard</b>! Press <b>Ctrl+V</b> into the folder path box and click <b>'Select Folder'</b>."
             )
-            s3.setStyleSheet("font-size: 12px; line-height: 1.4; color: #57ab5a;")
+            s3.setStyleSheet(
+                "font-size: 9pt; line-height: 1.4; color: #57ab5a;")
             s3.setWordWrap(True)
             steps_lay.addWidget(s3)
 
@@ -1669,7 +1723,8 @@ class ExtensionInstallGuideDialog(QDialog):
         path_box.setSpacing(8)
         self.path_edit = QLineEdit(self.target_path)
         self.path_edit.setReadOnly(True)
-        self.path_edit.setStyleSheet("font-family: monospace; font-size: 11px;")
+        self.path_edit.setStyleSheet(
+            "font-family: monospace; font-size: 8.5pt;")
 
         btn_copy = QPushButton("Copy Path")
         btn_copy.setAutoDefault(False)
@@ -1677,7 +1732,8 @@ class ExtensionInstallGuideDialog(QDialog):
 
         btn_open = QPushButton("Open Folder")
         btn_open.setAutoDefault(False)
-        btn_open.clicked.connect(lambda: open_extension_folder(self.ext_dir, self.browser_type))
+        btn_open.clicked.connect(lambda: open_extension_folder(
+            self.ext_dir, self.browser_type))
 
         path_box.addWidget(self.path_edit, 1)
         path_box.addWidget(btn_copy)
@@ -1685,7 +1741,7 @@ class ExtensionInstallGuideDialog(QDialog):
         lay.addLayout(path_box)
 
         self.lbl_status = QLabel("Path copied to clipboard automatically!")
-        self.lbl_status.setStyleSheet("color: #4f86c6; font-size: 11px;")
+        self.lbl_status.setStyleSheet("color: #4f86c6; font-size: 8.5pt;")
         lay.addWidget(self.lbl_status)
 
         lay.addStretch(1)
@@ -1707,14 +1763,17 @@ class ExtensionInstallGuideDialog(QDialog):
 
 
 class FirstRunExtensionDialog(QDialog):
-    """First-run onboarding dialog guiding the user to install the browser extension."""
+    """First-run onboarding wizard guiding the user to configure download folder,
+    install browser extension, and verify bridge connectivity."""
 
-    def __init__(self, parent: Optional[QWidget] = None):
+    def __init__(self, parent: Optional[QWidget] = None, settings: Optional[dict] = None):
         super().__init__(parent)
-        self.setWindowTitle("Welcome to CIDM — Browser Extension Setup")
-        self.resize(560, 430)
+        self.setWindowTitle("Welcome to CIDM — Initial Setup Wizard")
+        self.resize(600, 560)
         self.setModal(True)
         self.ext_dir = sync_extension_files("all")
+        self.app_settings = dict(settings or {})
+        self.save_dir = str(self.app_settings.get("save_dir") or default_download_dir())
 
         lay = QVBoxLayout(self)
         lay.setContentsMargins(20, 20, 20, 20)
@@ -1729,19 +1788,35 @@ class FirstRunExtensionDialog(QDialog):
         title_box = QVBoxLayout()
         title_box.setSpacing(4)
         lbl_title = QLabel("Welcome to CIDM!")
-        lbl_title.setStyleSheet("font-size: 17px; font-weight: bold; color: #4f86c6;")
+        lbl_title.setStyleSheet(
+            "font-size: 13pt; font-weight: bold; color: #4f86c6;")
         lbl_sub = QLabel(
-            "Install the CIDM browser extension to automatically capture file downloads "
-            "and download streaming videos (YouTube, HLS, DASH, MP4) with 1 click."
+            "Complete this quick 3-step setup to customize your download directory, "
+            "enable 1-click browser capturing, and verify bridge connectivity."
         )
-        lbl_sub.setStyleSheet("font-size: 12px; color: #9aa0aa; line-height: 1.4;")
+        lbl_sub.setStyleSheet(
+            "font-size: 9pt; color: #9aa0aa; line-height: 1.4;")
         lbl_sub.setWordWrap(True)
         title_box.addWidget(lbl_title)
         title_box.addWidget(lbl_sub)
         header.addLayout(title_box, 1)
         lay.addLayout(header)
 
-        gb = QGroupBox("Detected Browsers on Your Computer")
+        # 1. Download Folder Setup
+        gb_folder = QGroupBox("1. Default Download Folder")
+        gb_f_lay = QHBoxLayout(gb_folder)
+        gb_f_lay.setSpacing(8)
+        self.txt_folder = QLineEdit(self.save_dir)
+        self.txt_folder.setReadOnly(True)
+        btn_browse_folder = QPushButton("Browse...")
+        btn_browse_folder.setAutoDefault(False)
+        btn_browse_folder.clicked.connect(self._browse_save_dir)
+        gb_f_lay.addWidget(self.txt_folder, 1)
+        gb_f_lay.addWidget(btn_browse_folder)
+        lay.addWidget(gb_folder)
+
+        # 2. Browser Integration
+        gb = QGroupBox("2. Browser Extension Integration")
         gb_lay = QVBoxLayout(gb)
         gb_lay.setSpacing(10)
 
@@ -1751,9 +1826,9 @@ class FirstRunExtensionDialog(QDialog):
                 row = QHBoxLayout()
                 row.setSpacing(10)
                 name_lbl = QLabel(f"<b>{b['name']}</b>")
-                name_lbl.setStyleSheet("font-size: 13px;")
+                name_lbl.setStyleSheet("font-size: 10pt;")
                 path_lbl = QLabel(b["exe"])
-                path_lbl.setStyleSheet("color: #6b7280; font-size: 11px;")
+                path_lbl.setStyleSheet("color: #6b7280; font-size: 8.5pt;")
                 path_lbl.setToolTip(b["exe"])
 
                 btn_install = QPushButton(f"Install in {b['name']}")
@@ -1776,8 +1851,6 @@ class FirstRunExtensionDialog(QDialog):
             lbl_none.setStyleSheet("color: #9aa0aa; font-style: italic;")
             gb_lay.addWidget(lbl_none)
 
-        lay.addWidget(gb)
-
         bottom_actions = QHBoxLayout()
         bottom_actions.setSpacing(10)
 
@@ -1788,11 +1861,26 @@ class FirstRunExtensionDialog(QDialog):
 
         btn_open_folder = QPushButton("Open Extension Folder")
         btn_open_folder.setAutoDefault(False)
-        btn_open_folder.clicked.connect(lambda: open_extension_folder(self.ext_dir))
+        btn_open_folder.clicked.connect(
+            lambda: open_extension_folder(self.ext_dir))
         bottom_actions.addWidget(btn_open_folder)
 
         bottom_actions.addStretch(1)
-        lay.addLayout(bottom_actions)
+        gb_lay.addLayout(bottom_actions)
+        lay.addWidget(gb)
+
+        # 3. Connection & Pairing Verification
+        gb_test = QGroupBox("3. Verify Connection")
+        gb_t_lay = QHBoxLayout(gb_test)
+        gb_t_lay.setSpacing(10)
+        self.lbl_bridge_status = QLabel("Click 'Test Bridge Connection' to verify local pairing.")
+        self.lbl_bridge_status.setStyleSheet("color: #9aa0aa; font-size: 8.5pt;")
+        btn_test_bridge = QPushButton("Test Bridge Connection")
+        btn_test_bridge.setAutoDefault(False)
+        btn_test_bridge.clicked.connect(self._test_bridge)
+        gb_t_lay.addWidget(self.lbl_bridge_status, 1)
+        gb_t_lay.addWidget(btn_test_bridge)
+        lay.addWidget(gb_test)
 
         lay.addStretch(1)
 
@@ -1804,12 +1892,30 @@ class FirstRunExtensionDialog(QDialog):
 
         footer.addStretch(1)
 
-        btn_done = QPushButton("Done")
+        btn_done = QPushButton("Finish Setup")
+        btn_done.setObjectName("primaryBtn")
         btn_done.setDefault(True)
         btn_done.clicked.connect(self.accept)
         footer.addWidget(btn_done)
 
         lay.addLayout(footer)
+
+    def _browse_save_dir(self):
+        d = QFileDialog.getExistingDirectory(
+            self, "Select Default Download Folder", self.save_dir
+        )
+        if d:
+            self.save_dir = d
+            self.txt_folder.setText(d)
+
+    def _test_bridge(self):
+        ok, msg = test_bridge_connection()
+        if ok:
+            self.lbl_bridge_status.setText(f"✓ {msg}")
+            self.lbl_bridge_status.setStyleSheet("color: #57ab5a; font-weight: 600; font-size: 8.5pt;")
+        else:
+            self.lbl_bridge_status.setText(f"○ {msg}")
+            self.lbl_bridge_status.setStyleSheet("color: #e6c875; font-weight: 500; font-size: 8.5pt;")
 
     def _install_browser(self, b_info: Dict[str, str]):
         launch_browser_for_extension_install(
@@ -1875,11 +1981,12 @@ class UpdateAvailableDialog(QDialog):
         title_col = QVBoxLayout()
         title_col.setSpacing(3)
         lbl_title = QLabel("A new version of CIDM is available!")
-        lbl_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #4f86c6;")
+        lbl_title.setStyleSheet(
+            "font-size: 12pt; font-weight: bold; color: #4f86c6;")
         lbl_ver = QLabel(
             f"<b>{update_info.tag_name}</b> is ready to install (current version: v{APP_VERSION})."
         )
-        lbl_ver.setStyleSheet("font-size: 12px; color: #e6e8ec;")
+        lbl_ver.setStyleSheet("font-size: 9pt; color: #e6e8ec;")
         title_col.addWidget(lbl_title)
         title_col.addWidget(lbl_ver)
         header.addLayout(title_col, 1)
@@ -1892,7 +1999,7 @@ class UpdateAvailableDialog(QDialog):
         self.notes_browser = QTextBrowser()
         self.notes_browser.setOpenExternalLinks(True)
         self.notes_browser.setStyleSheet(
-            "background-color: #121316; border: 1px solid #33373e; border-radius: 4px; padding: 6px; font-size: 12px; color: #cbd5e1;"
+            "background-color: #121316; border: 1px solid #33373e; border-radius: 4px; padding: 6px; font-size: 9pt; color: #cbd5e1;"
         )
         self.notes_browser.setMarkdown(self.update_info.display_notes)
         gb_lay.addWidget(self.notes_browser)
@@ -1908,11 +2015,12 @@ class UpdateAvailableDialog(QDialog):
         self.progress_bar.setValue(0)
         self.progress_bar.setFixedHeight(18)
         self.progress_bar.setStyleSheet(
-            "QProgressBar { background-color: #202226; border: 1px solid #33373e; border-radius: 4px; text-align: center; color: #ffffff; font-weight: bold; font-size: 11px; }"
+            "QProgressBar { background-color: #202226; border: 1px solid #33373e; border-radius: 4px; text-align: center; color: #ffffff; font-weight: bold; font-size: 8.5pt; }"
             "QProgressBar::chunk { background-color: #4f86c6; border-radius: 3px; }"
         )
         self.lbl_progress_status = QLabel("Preparing download...")
-        self.lbl_progress_status.setStyleSheet("font-size: 11px; color: #9aa0aa;")
+        self.lbl_progress_status.setStyleSheet(
+            "font-size: 8.5pt; color: #9aa0aa;")
         prog_lay.addWidget(self.lbl_progress_status)
         prog_lay.addWidget(self.progress_bar)
         self.progress_container.hide()
@@ -1983,21 +2091,30 @@ class UpdateAvailableDialog(QDialog):
         self.btn_view_web.hide()
         self.btn_cancel_dl.show()
         self.progress_container.show()
-        self.lbl_progress_status.setText(f"Connecting to download {asset.name}...")
+        self.lbl_progress_status.setText(
+            f"Connecting to download {asset.name}...")
 
         self._download_worker = UpdateDownloadWorker(
             asset_url=asset.url,
             target_filename=asset.name,
+            expected_size=getattr(asset, "size", 0),
             parent=self,
         )
         self._download_worker.progress.connect(self._on_download_progress)
-        self._download_worker.finished.connect(self._on_download_finished)
+        self._download_worker.completed.connect(self._on_download_finished)
         self._download_worker.failed.connect(self._on_download_failed)
+        self._download_worker.cancelled.connect(self._on_download_cancelled)
         self._download_worker.start()
 
     def _cancel_download(self):
         if self._download_worker and self._download_worker.isRunning():
             self._download_worker.cancel()
+        self._reset_dialog_buttons()
+
+    def _on_download_cancelled(self):
+        self._reset_dialog_buttons()
+
+    def _reset_dialog_buttons(self):
         self.progress_container.hide()
         self.btn_cancel_dl.hide()
         self.btn_update.show()
@@ -2016,7 +2133,8 @@ class UpdateAvailableDialog(QDialog):
 
     def _on_download_finished(self, local_path: str):
         self._downloaded_file = local_path
-        self.lbl_progress_status.setText("Download complete! Launching updater...")
+        self.lbl_progress_status.setText(
+            "Download complete! Launching updater...")
         self.progress_bar.setValue(100)
 
         # Give short moment then apply update and terminate current app
@@ -2041,6 +2159,9 @@ class UpdateAvailableDialog(QDialog):
             self._cancel_download()
 
     def _on_download_failed(self, err_msg: str):
+        if self._download_worker and getattr(self._download_worker, "_is_cancelled", False):
+            self._cancel_download()
+            return
         QMessageBox.critical(
             self,
             "Download Error",
@@ -2220,6 +2341,43 @@ class SettingsDialog(QDialog):
         )
         lay.addWidget(self.cb_categorize)
 
+        # Watch Folder Section
+        gb_watch = QGroupBox("Watch Folder (Auto-queue URLs from dropped files)")
+        gb_watch_lay = QVBoxLayout(gb_watch)
+        gb_watch_lay.setSpacing(8)
+
+        self.cb_watch_enabled = QCheckBox("Enable Watch Folder")
+        self.cb_watch_enabled.setChecked(
+            bool(self.settings.get("watch_folder_enabled", False))
+        )
+        gb_watch_lay.addWidget(self.cb_watch_enabled)
+
+        watch_dir_box = QHBoxLayout()
+        watch_dir_box.setSpacing(8)
+        cur_watch = str(self.settings.get("watch_folder_path") or "")
+        if not cur_watch:
+            cur_watch = os.path.join(self.save_dir_edit.text(), "Watch")
+        self.watch_dir_edit = QLineEdit(cur_watch)
+        btn_browse_watch = QPushButton("Browse...")
+        btn_browse_watch.clicked.connect(self._browse_watch_dir)
+        watch_dir_box.addWidget(self.watch_dir_edit, 1)
+        watch_dir_box.addWidget(btn_browse_watch)
+        gb_watch_lay.addLayout(watch_dir_box)
+
+        self.cb_watch_autostart = QCheckBox("Automatically start downloads when detected")
+        self.cb_watch_autostart.setChecked(
+            bool(self.settings.get("watch_folder_autostart", True))
+        )
+        gb_watch_lay.addWidget(self.cb_watch_autostart)
+
+        self.cb_watch_delete = QCheckBox("Delete processed text files (otherwise renames to .processed)")
+        self.cb_watch_delete.setChecked(
+            bool(self.settings.get("watch_folder_delete_file", False))
+        )
+        gb_watch_lay.addWidget(self.cb_watch_delete)
+
+        lay.addWidget(gb_watch)
+
         lay.addStretch(1)
         self.tabs.addTab(w, "Downloads & Folders")
 
@@ -2229,6 +2387,13 @@ class SettingsDialog(QDialog):
         )
         if d:
             self.save_dir_edit.setText(d)
+
+    def _browse_watch_dir(self):
+        d = QFileDialog.getExistingDirectory(
+            self, "Select Watch Folder", self.watch_dir_edit.text()
+        )
+        if d:
+            self.watch_dir_edit.setText(d)
 
     def _build_browser_tab(self):
         scroll = QScrollArea()
@@ -2247,7 +2412,8 @@ class SettingsDialog(QDialog):
             "The CIDM extension integrates with your web browser to capture file downloads "
             "and detect high-speed video streams (YouTube, HLS, DASH, MP4) directly."
         )
-        lbl_desc.setStyleSheet("color: #9aa0aa; font-size: 12px; line-height: 1.4;")
+        lbl_desc.setStyleSheet(
+            "color: #9aa0aa; font-size: 9pt; line-height: 1.4;")
         lbl_desc.setWordWrap(True)
         gb_ext_lay.addWidget(lbl_desc)
 
@@ -2262,15 +2428,18 @@ class SettingsDialog(QDialog):
         lbl_chr.setFixedWidth(120)
         self.ext_dir_edit = QLineEdit(chr_dir)
         self.ext_dir_edit.setReadOnly(True)
-        self.ext_dir_edit.setStyleSheet("font-family: monospace; font-size: 11px;")
+        self.ext_dir_edit.setStyleSheet(
+            "font-family: monospace; font-size: 8.5pt;")
 
         btn_copy_chr = QPushButton("Copy Path")
         btn_copy_chr.setAutoDefault(False)
-        btn_copy_chr.clicked.connect(lambda: self._copy_ext_path_text(chr_dir, "Chromium folder"))
+        btn_copy_chr.clicked.connect(
+            lambda: self._copy_ext_path_text(chr_dir, "Chromium folder"))
 
         btn_folder_chr = QPushButton("Open Folder")
         btn_folder_chr.setAutoDefault(False)
-        btn_folder_chr.clicked.connect(lambda: open_extension_folder(chr_dir, "chromium"))
+        btn_folder_chr.clicked.connect(
+            lambda: open_extension_folder(chr_dir, "chromium"))
 
         chr_row.addWidget(lbl_chr)
         chr_row.addWidget(self.ext_dir_edit, 1)
@@ -2285,15 +2454,18 @@ class SettingsDialog(QDialog):
         lbl_fox.setFixedWidth(120)
         self.ext_fox_edit = QLineEdit(fox_manifest)
         self.ext_fox_edit.setReadOnly(True)
-        self.ext_fox_edit.setStyleSheet("font-family: monospace; font-size: 11px;")
+        self.ext_fox_edit.setStyleSheet(
+            "font-family: monospace; font-size: 8.5pt;")
 
         btn_copy_fox = QPushButton("Copy Path")
         btn_copy_fox.setAutoDefault(False)
-        btn_copy_fox.clicked.connect(lambda: self._copy_ext_path_text(fox_manifest, "Firefox manifest"))
+        btn_copy_fox.clicked.connect(
+            lambda: self._copy_ext_path_text(fox_manifest, "Firefox manifest"))
 
         btn_folder_fox = QPushButton("Open Folder")
         btn_folder_fox.setAutoDefault(False)
-        btn_folder_fox.clicked.connect(lambda: open_extension_folder(fox_dir, "firefox"))
+        btn_folder_fox.clicked.connect(
+            lambda: open_extension_folder(fox_dir, "firefox"))
 
         fox_row.addWidget(lbl_fox)
         fox_row.addWidget(self.ext_fox_edit, 1)
@@ -2316,7 +2488,7 @@ class SettingsDialog(QDialog):
                 lbl_bname = QLabel(f"<b>{b['name']}</b>")
                 lbl_bname.setFixedWidth(130)
                 lbl_bpath = QLabel(b["exe"])
-                lbl_bpath.setStyleSheet("color: #6b7280; font-size: 11px;")
+                lbl_bpath.setStyleSheet("color: #6b7280; font-size: 8.5pt;")
                 lbl_bpath.setToolTip(b["exe"])
 
                 btn_add_b = QPushButton(f"Install in {b['name']}")
@@ -2351,7 +2523,8 @@ class SettingsDialog(QDialog):
             "Select any Chromium-based or custom browser executable (.exe) on your computer "
             "(e.g. Thorium, Ungoogled Chromium, Arc, Opera GX, Vivaldi, Floorp, Zen, or Portable Browser):"
         )
-        lbl_cust_hint.setStyleSheet("color: #9aa0aa; font-size: 12px; line-height: 1.4;")
+        lbl_cust_hint.setStyleSheet(
+            "color: #9aa0aa; font-size: 9pt; line-height: 1.4;")
         lbl_cust_hint.setWordWrap(True)
         gb_cust_lay.addWidget(lbl_cust_hint)
 
@@ -2455,7 +2628,7 @@ class SettingsDialog(QDialog):
             "Select active network adapters for link aggregation channel bonding. "
             "Worker threads bind across checked adapters simultaneously."
         )
-        lbl_net_desc.setStyleSheet("color: #9aa0aa; font-size: 12px;")
+        lbl_net_desc.setStyleSheet("color: #9aa0aa; font-size: 9pt;")
         lbl_net_desc.setWordWrap(True)
         gb_net_lay.addWidget(lbl_net_desc)
 
@@ -2470,7 +2643,7 @@ class SettingsDialog(QDialog):
         sn_box.setSpacing(6)
         self.lbl_subnet_warning = QLabel("")
         self.lbl_subnet_warning.setStyleSheet(
-            "color: #e6c875; font-size: 11px; line-height: 1.35;"
+            "color: #e6c875; font-size: 8.5pt; line-height: 1.35;"
         )
         self.lbl_subnet_warning.setWordWrap(True)
         btn_metric_helper = QPushButton("Windows Interface Metric Guide")
@@ -2521,7 +2694,7 @@ class SettingsDialog(QDialog):
         lbl_proxies = QLabel(
             "Proxy List (one per line — supports HTTP, HTTPS, and SOCKS5):"
         )
-        lbl_proxies.setStyleSheet("color: #9aa0aa; font-size: 12px;")
+        lbl_proxies.setStyleSheet("color: #9aa0aa; font-size: 9pt;")
         gb_proxy_lay.addWidget(lbl_proxies)
 
         self.txt_proxy_pool = QTextEdit()
@@ -2685,11 +2858,12 @@ class SettingsDialog(QDialog):
         v_info = QVBoxLayout()
         v_info.setSpacing(3)
         lbl_name = QLabel("<b>CIDM — Chaos Internet Download Manager</b>")
-        lbl_name.setStyleSheet("font-size: 13px; color: #4f86c6;")
+        lbl_name.setStyleSheet("font-size: 10pt; color: #4f86c6;")
         lbl_cur = QLabel(f"Current Installed Version: <b>v{APP_VERSION}</b>")
-        lbl_cur.setStyleSheet("font-size: 12px; color: #e6e8ec;")
-        lbl_channel = QLabel("Channel: Official GitHub Releases (Automatic Updates)")
-        lbl_channel.setStyleSheet("font-size: 11px; color: #9aa0aa;")
+        lbl_cur.setStyleSheet("font-size: 9pt; color: #e6e8ec;")
+        lbl_channel = QLabel(
+            "Channel: Official GitHub Releases (Automatic Updates)")
+        lbl_channel.setStyleSheet("font-size: 8.5pt; color: #9aa0aa;")
         v_info.addWidget(lbl_name)
         v_info.addWidget(lbl_cur)
         v_info.addWidget(lbl_channel)
@@ -2736,7 +2910,8 @@ class SettingsDialog(QDialog):
 
         self.btn_view_releases = QPushButton("View Releases on GitHub")
         self.btn_view_releases.setAutoDefault(False)
-        self.btn_view_releases.clicked.connect(lambda: webbrowser.open(RELEASES_HTML_URL))
+        self.btn_view_releases.clicked.connect(
+            lambda: webbrowser.open(RELEASES_HTML_URL))
         btn_row.addWidget(self.btn_view_releases)
 
         btn_row.addStretch(1)
@@ -2745,7 +2920,8 @@ class SettingsDialog(QDialog):
         self.lbl_update_status = QLabel(
             "Click 'Check for Updates Now' to check GitHub for newer versions."
         )
-        self.lbl_update_status.setStyleSheet("color: #9aa0aa; font-size: 11px;")
+        self.lbl_update_status.setStyleSheet(
+            "color: #9aa0aa; font-size: 8.5pt;")
         gb_check_lay.addWidget(self.lbl_update_status)
 
         lay.addWidget(gb_check)
@@ -2756,14 +2932,18 @@ class SettingsDialog(QDialog):
     def _manual_check_updates(self):
         self.btn_check_now.setEnabled(False)
         self.lbl_update_status.setText("Connecting to GitHub Releases API...")
-        self.lbl_update_status.setStyleSheet("color: #4f86c6; font-size: 11px;")
+        self.lbl_update_status.setStyleSheet(
+            "color: #4f86c6; font-size: 8.5pt;")
 
         self._settings_check_worker = UpdateCheckWorker(
             current_version=APP_VERSION, parent=self
         )
-        self._settings_check_worker.update_available.connect(self._on_settings_update_available)
-        self._settings_check_worker.up_to_date.connect(self._on_settings_up_to_date)
-        self._settings_check_worker.check_failed.connect(self._on_settings_check_failed)
+        self._settings_check_worker.update_available.connect(
+            self._on_settings_update_available)
+        self._settings_check_worker.up_to_date.connect(
+            self._on_settings_up_to_date)
+        self._settings_check_worker.check_failed.connect(
+            self._on_settings_check_failed)
         self._settings_check_worker.start()
 
     def _on_settings_update_available(self, update_info: UpdateInfo):
@@ -2771,7 +2951,8 @@ class SettingsDialog(QDialog):
         self.lbl_update_status.setText(
             f"Update Available: <b>{update_info.tag_name}</b> ({update_info.title})"
         )
-        self.lbl_update_status.setStyleSheet("color: #57ab5a; font-size: 11px;")
+        self.lbl_update_status.setStyleSheet(
+            "color: #57ab5a; font-size: 8.5pt;")
         dlg = UpdateAvailableDialog(update_info, parent=self)
         dlg.exec()
 
@@ -2780,7 +2961,8 @@ class SettingsDialog(QDialog):
         self.lbl_update_status.setText(
             f"You are running the latest version: <b>v{cur_ver}</b>."
         )
-        self.lbl_update_status.setStyleSheet("color: #57ab5a; font-size: 11px;")
+        self.lbl_update_status.setStyleSheet(
+            "color: #57ab5a; font-size: 8.5pt;")
         QMessageBox.information(
             self,
             "CIDM Up to Date",
@@ -2790,7 +2972,8 @@ class SettingsDialog(QDialog):
     def _on_settings_check_failed(self, err_msg: str):
         self.btn_check_now.setEnabled(True)
         self.lbl_update_status.setText(f"Check failed: {err_msg}")
-        self.lbl_update_status.setStyleSheet("color: #cf5c5c; font-size: 11px;")
+        self.lbl_update_status.setStyleSheet(
+            "color: #cf5c5c; font-size: 8.5pt;")
         QMessageBox.warning(
             self,
             "Update Check Failed",
@@ -2822,6 +3005,10 @@ class SettingsDialog(QDialog):
             "max_concurrent_downloads": self.spin_concur.value(),
             "file_conflict": self.combo_conflict.currentText(),
             "auto_categorize": self.cb_categorize.isChecked(),
+            "watch_folder_enabled": self.cb_watch_enabled.isChecked() if hasattr(self, "cb_watch_enabled") else False,
+            "watch_folder_path": self.watch_dir_edit.text().strip() if hasattr(self, "watch_dir_edit") else "",
+            "watch_folder_autostart": self.cb_watch_autostart.isChecked() if hasattr(self, "cb_watch_autostart") else True,
+            "watch_folder_delete_file": self.cb_watch_delete.isChecked() if hasattr(self, "cb_watch_delete") else False,
             "speed_limit_enabled": self.cb_speed_limit.isChecked(),
             "speed_limit_kbps": self.spin_speed.value(),
             "custom_user_agent": self.ua_edit.text().strip(),
@@ -2854,6 +3041,21 @@ class SettingsDialog(QDialog):
 # --------------------------------------------------------------------------- #
 # Add-URL / intercepted-download dialog
 # --------------------------------------------------------------------------- #
+def check_double_extension(name: str) -> Optional[str]:
+    """Detect deceptive double extensions (e.g. document.pdf.exe or invoice.docx.vbs)."""
+    if not name or "." not in name:
+        return None
+    dangerous_exts = {".exe", ".bat", ".cmd", ".msi", ".vbs", ".scr", ".js", ".wsf", ".hta", ".pif"}
+    doc_exts = {".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".jpg", ".jpeg", ".png", ".zip", ".rar", ".txt", ".mp4", ".mp3"}
+    parts = name.lower().split(".")
+    if len(parts) >= 3:
+        outer = "." + parts[-1]
+        inner = "." + parts[-2]
+        if outer in dangerous_exts and inner in doc_exts:
+            return f"Warning: '{name}' is an executable program ({outer}) disguised with a document extension ({inner})."
+    return None
+
+
 class AddDownloadDialog(QDialog):
     def __init__(
         self,
@@ -2874,6 +3076,12 @@ class AddDownloadDialog(QDialog):
     ):
         super().__init__(parent)
         self.settings = settings or {}
+        self._name_edited = False
+        self._gen = 0
+        self._probe_out: Optional[tuple[int, bool, Any, Any]] = None
+        self._probe_lock = threading.Lock()
+        self._probed_media_result = None
+
         url = normalize_download_url(url)
         self.kind = kind
         self.origin = origin or ""
@@ -2914,7 +3122,6 @@ class AddDownloadDialog(QDialog):
 
         self.format_label = QLabel("Quality / Format:")
         self.format_combo = QComboBox()
-        self.format_combo.currentIndexChanged.connect(self._on_format_changed)
         if self.is_media:
             default_opt = QualityOption(
                 label="Best Video + Audio (MP4)",
@@ -2939,11 +3146,6 @@ class AddDownloadDialog(QDialog):
         clean_initial_name = sanitize_filename(filename) if filename else ""
         if clean_initial_name and is_generic_name(clean_initial_name):
             clean_initial_name = ""
-        self._name_edited = False
-        self._gen = 0
-        self._probe_out: Optional[tuple[int, bool, Any, Any]] = None
-        self._probe_lock = threading.Lock()
-        self._probed_media_result = None
         self.name_edit = QLineEdit(clean_initial_name)
         self.name_edit.setPlaceholderText(
             "Detecting from server / media..."
@@ -2951,6 +3153,7 @@ class AddDownloadDialog(QDialog):
         self.name_edit.textEdited.connect(
             lambda _t: setattr(self, "_name_edited", True)
         )
+        self.format_combo.currentIndexChanged.connect(self._on_format_changed)
         if not clean_initial_name and url:
             guess = filename_from_url(url)
             if self.is_hls and guess.lower().endswith((".m3u8", ".m3u")):
@@ -2960,7 +3163,7 @@ class AddDownloadDialog(QDialog):
             else:
                 self.name_edit.setText("")
         self.info_label = QLabel("")
-        self.info_label.setStyleSheet("color: #9aa0aa; font-size: 12px;")
+        self.info_label.setStyleSheet("color: #9aa0aa; font-size: 9pt;")
 
         self.dir_edit = QLineEdit(save_dir or default_download_dir())
         browse = QPushButton("Browse...")
@@ -3099,6 +3302,15 @@ class AddDownloadDialog(QDialog):
         super().showEvent(event)
         self.raise_()
         self.activateWindow()
+        if sys.platform == "win32":
+            try:
+                import ctypes
+                hwnd = int(self.winId())
+                ctypes.windll.user32.SetForegroundWindow(hwnd)
+                ctypes.windll.user32.BringWindowToTop(hwnd)
+            except Exception:
+                pass
+        QApplication.alert(self, 3000)
 
     def _browse(self):
         d = QFileDialog.getExistingDirectory(
@@ -3204,7 +3416,7 @@ class AddDownloadDialog(QDialog):
                     "Could not probe media (the download may still work)."
                 )
                 self.info_label.setStyleSheet(
-                    "color: #9aa0aa; font-size: 12px;"
+                    "color: #9aa0aa; font-size: 9pt;"
                 )
                 return
             self._probed_media_result = m_res
@@ -3214,7 +3426,7 @@ class AddDownloadDialog(QDialog):
                     "Active livestream detected. Only VOD (non-live) streams are supported."
                 )
                 self.info_label.setStyleSheet(
-                    "color: #cf5c5c; font-weight: bold; font-size: 12px;"
+                    "color: #cf5c5c; font-weight: bold; font-size: 9pt;"
                 )
             else:
                 dur_str = (
@@ -3224,7 +3436,7 @@ class AddDownloadDialog(QDialog):
                 )
                 self.info_label.setText(f"{m_res.title}{dur_str}")
                 self.info_label.setStyleSheet(
-                    "color: #9aa0aa; font-size: 12px;"
+                    "color: #9aa0aa; font-size: 9pt;"
                 )
 
             self.format_combo.blockSignals(True)
@@ -3239,7 +3451,8 @@ class AddDownloadDialog(QDialog):
             subtitles = m_res.subtitles
             if isinstance(subtitles, (list, tuple)):
                 self._populate_subtitles(
-                    [subtitle for subtitle in subtitles if isinstance(subtitle, dict)]
+                    [subtitle for subtitle in subtitles if isinstance(
+                        subtitle, dict)]
                 )
 
             cur_opt = self.format_combo.currentData()
@@ -3259,7 +3472,7 @@ class AddDownloadDialog(QDialog):
                     "Could not probe the server (the download may still work)."
                 )
                 self.info_label.setStyleSheet(
-                    "color: #9aa0aa; font-size: 12px;"
+                    "color: #9aa0aa; font-size: 9pt;"
                 )
                 return
             size = (
@@ -3273,7 +3486,7 @@ class AddDownloadDialog(QDialog):
                 else "single connection only"
             )
             self.info_label.setText(f"{size}  ·  {rng}")
-            self.info_label.setStyleSheet("color: #9aa0aa; font-size: 12px;")
+            self.info_label.setStyleSheet("color: #9aa0aa; font-size: 9pt;")
             if u_res.filename:
                 cur_text = self.name_edit.text().strip()
                 if not self._name_edited or is_generic_name(cur_text):
@@ -3281,12 +3494,14 @@ class AddDownloadDialog(QDialog):
                     self._name_edited = False
 
     def _on_format_changed(self):
-        if not self.is_media or not self._probed_media_result:
+        if not getattr(self, "is_media", False) or not getattr(self, "_probed_media_result", None):
+            return
+        if not hasattr(self, "format_combo") or not hasattr(self, "name_edit"):
             return
         cur_opt = self.format_combo.currentData()
         if not cur_opt:
             return
-        if not self._name_edited:
+        if not getattr(self, "_name_edited", False):
             self.name_edit.setText(
                 f"{self._probed_media_result.sanitized_title}.{cur_opt.ext}"
             )
@@ -3303,6 +3518,19 @@ class AddDownloadDialog(QDialog):
                 self, "Invalid URL", "Please enter a valid http:// or https:// URL."
             )
             return
+
+        cur_name = self.name_edit.text().strip()
+        double_ext_warning = check_double_extension(cur_name)
+        if double_ext_warning:
+            res = QMessageBox.warning(
+                self,
+                "Security Warning: Executable Disguise",
+                f"{double_ext_warning}\n\nAre you sure you want to download and save this executable file?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if res != QMessageBox.StandardButton.Yes:
+                return
         if self._probed_media_result and self._probed_media_result.is_live:
             QMessageBox.warning(
                 self,
@@ -3438,13 +3666,13 @@ class SegmentPanel(QGroupBox):
         outer.setContentsMargins(8, 6, 8, 6)
         outer.setSpacing(6)
         self.summary = QLabel("Select a download to see its details.")
-        self.summary.setStyleSheet("color: #9aa0aa; font-size: 11px;")
+        self.summary.setStyleSheet("color: #9aa0aa; font-size: 8.5pt;")
         outer.addWidget(self.summary)
 
         # Multi-Interface Link Aggregation Real-Time Throughput Banner
         self.adapter_summary = QLabel("")
         self.adapter_summary.setStyleSheet(
-            "color: #4f86c6; font-size: 11px; font-weight: 600; padding: 1px 0;"
+            "color: #4f86c6; font-size: 8.5pt; font-weight: 600; padding: 1px 0;"
         )
         self.adapter_summary.setVisible(False)
         outer.addWidget(self.adapter_summary)
@@ -3478,28 +3706,28 @@ class SegmentPanel(QGroupBox):
 
         lbl_f = QLabel("Stream Format:")
         lbl_f.setStyleSheet(
-            "color: #9aa0aa; font-weight: 600; font-size: 11px;")
+            "color: #9aa0aa; font-weight: 600; font-size: 8.5pt;")
         self.lbl_format = QLabel("")
-        self.lbl_format.setStyleSheet("font-weight: 500; font-size: 11px;")
+        self.lbl_format.setStyleSheet("font-weight: 500; font-size: 8.5pt;")
 
         lbl_r = QLabel("Resolution:")
         lbl_r.setStyleSheet(
-            "color: #9aa0aa; font-weight: 600; font-size: 11px;")
+            "color: #9aa0aa; font-weight: 600; font-size: 8.5pt;")
         self.lbl_res = QLabel("")
-        self.lbl_res.setStyleSheet("font-weight: 500; font-size: 11px;")
+        self.lbl_res.setStyleSheet("font-weight: 500; font-size: 8.5pt;")
 
         lbl_m = QLabel("FFmpeg State:")
         lbl_m.setStyleSheet(
-            "color: #9aa0aa; font-weight: 600; font-size: 11px;")
+            "color: #9aa0aa; font-weight: 600; font-size: 8.5pt;")
         self.lbl_merge = QLabel("")
         self.lbl_merge.setStyleSheet(
-            "color: #4f86c6; font-weight: 600; font-size: 11px;")
+            "color: #4f86c6; font-weight: 600; font-size: 8.5pt;")
 
         lbl_s = QLabel("Downloaded Stats:")
         lbl_s.setStyleSheet(
-            "color: #9aa0aa; font-weight: 600; font-size: 11px;")
+            "color: #9aa0aa; font-weight: 600; font-size: 8.5pt;")
         self.lbl_stats = QLabel("")
-        self.lbl_stats.setStyleSheet("font-size: 11px;")
+        self.lbl_stats.setStyleSheet("font-size: 8.5pt;")
 
         self.media_grid.addWidget(lbl_f, 0, 0)
         self.media_grid.addWidget(self.lbl_format, 0, 1)
@@ -3539,7 +3767,7 @@ class SegmentPanel(QGroupBox):
         for i in range(n):
             lbl = QLabel(f"Thread {i + 1}")
             lbl.setMinimumWidth(145)
-            lbl.setStyleSheet("color: #9aa0aa; font-size: 11px;")
+            lbl.setStyleSheet("color: #9aa0aa; font-size: 8.5pt;")
             bar = QProgressBar()
             bar.setRange(0, 1000)
             bar.setFixedHeight(12)
@@ -3548,7 +3776,7 @@ class SegmentPanel(QGroupBox):
             info.setAlignment(
                 Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
             )
-            info.setStyleSheet("color: #9aa0aa; font-size: 11px;")
+            info.setStyleSheet("color: #9aa0aa; font-size: 8.5pt;")
             self.grid.addWidget(lbl, i, 0)
             self.grid.addWidget(bar, i, 1)
             self.grid.addWidget(info, i, 2)
@@ -3850,7 +4078,7 @@ class PropertiesDialog(QDialog):
 
         self.lbl_match_result = QLabel("")
         self.lbl_match_result.setStyleSheet(
-            "font-weight: 600; font-size: 13px;"
+            "font-weight: 600; font-size: 10pt;"
         )
         form_chk.addRow("Verification:", self.lbl_match_result)
         l_chk.addLayout(form_chk)
@@ -3983,8 +4211,9 @@ class RefreshAddressDialog(QDialog):
         layout.addLayout(btn_row)
 
     def _open_browser(self):
-        ref = self.task.referer or self.task.url
-        QDesktopServices.openUrl(QUrl(ref))
+        ref = (self.task.referer or self.task.url or "").strip()
+        if ref.lower().startswith(("http://", "https://")):
+            QDesktopServices.openUrl(QUrl(ref))
 
     def _apply(self):
         new_url = self.edit_new_url.text().strip()
@@ -4021,7 +4250,7 @@ class CountdownDialog(QDialog):
             f"Download queue completed.\nComputer will {action_name.lower()} in {self.remaining} seconds."
         )
         self.lbl_msg.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_msg.setStyleSheet("font-size: 14px; font-weight: 500;")
+        self.lbl_msg.setStyleSheet("font-size: 10.5pt; font-weight: 500;")
         layout.addWidget(self.lbl_msg)
 
         btn_box = QHBoxLayout()
@@ -4066,6 +4295,8 @@ class BatchDownloadDialog(QDialog):
         parent: QWidget,
         initial_urls: Optional[List[str]] = None,
         referer: str = "",
+        cookies: str = "",
+        user_agent: str = "",
         save_dir: str = "",
         threads: int = 8,
     ):
@@ -4074,9 +4305,27 @@ class BatchDownloadDialog(QDialog):
         self.resize(720, 500)
         self.setModal(True)
         self.referer = referer
+        self.cookies = cookies
+        self.user_agent = user_agent
         self.save_dir = save_dir or default_download_dir()
         self.threads = threads
+        if initial_urls:
+            self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         self._build_ui(initial_urls or [])
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.raise_()
+        self.activateWindow()
+        if sys.platform == "win32":
+            try:
+                import ctypes
+                hwnd = int(self.winId())
+                ctypes.windll.user32.SetForegroundWindow(hwnd)
+                ctypes.windll.user32.BringWindowToTop(hwnd)
+            except Exception:
+                pass
+        QApplication.alert(self, 3000)
 
     def _build_ui(self, initial_urls: List[str]):
         layout = QVBoxLayout(self)
@@ -4103,7 +4352,7 @@ class BatchDownloadDialog(QDialog):
         lbl_pat_hint = QLabel(
             "Wildcard Examples: [01-20] (zero-padded numbers), [1-100] (integers), [a-z] (letters)"
         )
-        lbl_pat_hint.setStyleSheet("color: #9aa0aa; font-size: 12px;")
+        lbl_pat_hint.setStyleSheet("color: #9aa0aa; font-size: 9pt;")
         l_pat.addWidget(lbl_pat_hint)
 
         btn_gen_row = QHBoxLayout()
@@ -4366,6 +4615,8 @@ class BatchDownloadDialog(QDialog):
                     "threads": threads,
                     "queue_name": queue_name,
                     "referer": self.referer,
+                    "cookies": self.cookies,
+                    "user_agent": self.user_agent,
                 })
         return items
 
@@ -4735,7 +4986,7 @@ class SiteGrabberDialog(QDialog):
 
         # Results area
         self.lbl_status = QLabel("Ready to crawl.")
-        self.lbl_status.setStyleSheet("color: #9aa0aa; font-size: 12px;")
+        self.lbl_status.setStyleSheet("color: #9aa0aa; font-size: 9pt;")
         layout.addWidget(self.lbl_status)
 
         self.table = QTableWidget(0, 4)
@@ -5017,7 +5268,7 @@ class SpeedLimitPopup(QFrame):
         lay.setSpacing(10)
 
         title = QLabel("Global Download Speed Limit")
-        title.setStyleSheet("font-weight: 600; font-size: 12px;")
+        title.setStyleSheet("font-weight: 600; font-size: 9pt;")
         lay.addWidget(title)
 
         self.cb_enable = QCheckBox("Enable speed limit")
@@ -5043,7 +5294,7 @@ class SpeedLimitPopup(QFrame):
         presets_row.setSpacing(4)
         for label, val in [("512K", 512), ("1M", 1024), ("2M", 2048), ("5M", 5120)]:
             b = QPushButton(label)
-            b.setStyleSheet("padding: 3px 6px; font-size: 11px;")
+            b.setStyleSheet("padding: 3px 6px; font-size: 8.5pt;")
             b.clicked.connect(lambda _c=False, v=val: self._pick_preset(v))
             presets_row.addWidget(b)
         lay.addLayout(presets_row)
@@ -5147,6 +5398,8 @@ class MainWindow(QMainWindow):
             sync_extension_files("all")
         except Exception:
             pass
+
+        self._init_watch_folder()
 
         # First-run browser extension onboarding
         if not self.app_settings.get("extension_installed_prompt_shown", False):
@@ -5322,7 +5575,7 @@ class MainWindow(QMainWindow):
 
         lbl_conns = QLabel("Threads:")
         lbl_conns.setStyleSheet(
-            "font-size: 12px; font-weight: 500; color: #9aa0aa;")
+            "font-size: 9pt; font-weight: 500; color: #9aa0aa;")
         pill_lay.addWidget(lbl_conns)
         pill_lay.addStretch(1)
 
@@ -5404,7 +5657,7 @@ class MainWindow(QMainWindow):
         )
         self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.empty_label.setStyleSheet(
-            "color: #6b7280; font-size: 13px; background: transparent; line-height: 1.5;"
+            "color: #6b7280; font-size: 10pt; background: transparent; line-height: 1.5;"
         )
         self.empty_label.setAttribute(
             Qt.WidgetAttribute.WA_TransparentForMouseEvents, True
@@ -5836,15 +6089,21 @@ class MainWindow(QMainWindow):
         if self._is_quitting:
             return
         sync_extension_files("all")
-        dlg = FirstRunExtensionDialog(self)
-        dlg.exec()
+        dlg = FirstRunExtensionDialog(self, self.app_settings)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            if hasattr(dlg, "save_dir") and dlg.save_dir:
+                self.app_settings["save_dir"] = dlg.save_dir
+                self.settings.setValue("save_dir", dlg.save_dir)
         self.app_settings["extension_installed_prompt_shown"] = True
         save_settings(self.app_settings)
 
     def open_extension_setup(self):
         sync_extension_files("all")
-        dlg = FirstRunExtensionDialog(self)
-        dlg.exec()
+        dlg = FirstRunExtensionDialog(self, self.app_settings)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            if hasattr(dlg, "save_dir") and dlg.save_dir:
+                self.app_settings["save_dir"] = dlg.save_dir
+                self.settings.setValue("save_dir", dlg.save_dir)
         self.app_settings["extension_installed_prompt_shown"] = True
         save_settings(self.app_settings)
 
@@ -5854,7 +6113,8 @@ class MainWindow(QMainWindow):
         self._startup_update_worker = UpdateCheckWorker(
             current_version=APP_VERSION, parent=self
         )
-        self._startup_update_worker.update_available.connect(self._on_startup_update_found)
+        self._startup_update_worker.update_available.connect(
+            self._on_startup_update_found)
         self._startup_update_worker.start()
 
     def _on_startup_update_found(self, update_info: UpdateInfo):
@@ -5905,6 +6165,7 @@ class MainWindow(QMainWindow):
         save_settings(self.app_settings)
         apply_engine_settings(self.app_settings)
         self.apply_theme(self.app_settings.get("theme", "Dark Grey"))
+        self._update_watch_folder_timer()
         self.minimize_to_tray = bool(
             self.app_settings.get("minimize_to_tray", True)
         )
@@ -5915,6 +6176,143 @@ class MainWindow(QMainWindow):
         )
         self._schedule_queue()
         self._apply_category_filter()
+
+    def _init_watch_folder(self):
+        self._watch_folder_timer = QTimer(self)
+        self._watch_folder_timer.setInterval(4000)
+        self._watch_folder_timer.timeout.connect(self._scan_watch_folder)
+        self._update_watch_folder_timer()
+
+    def _update_watch_folder_timer(self):
+        if hasattr(self, "_watch_folder_timer"):
+            if self.app_settings.get("watch_folder_enabled", False):
+                if not self._watch_folder_timer.isActive():
+                    self._watch_folder_timer.start()
+            else:
+                if self._watch_folder_timer.isActive():
+                    self._watch_folder_timer.stop()
+
+    def _queue_watch_url(self, url: str, autostart: bool = True) -> bool:
+        url = normalize_download_url(url.strip())
+        if not url:
+            return False
+        task = create_task(
+            url=url,
+            save_dir=self.save_dir,
+            threads=self.thread_spin.value() if hasattr(self, "thread_spin") else 8,
+            selected_ips=self.get_enabled_ips() if hasattr(self, "get_enabled_ips") else None,
+            proxy_pool=self.app_settings.get("proxy_pool", []),
+            proxy_pool_enabled=bool(self.app_settings.get("proxy_pool_enabled", False)),
+            proxy_pool_include_direct=bool(self.app_settings.get("proxy_pool_include_direct", True)),
+            auto_categorize=bool(self.app_settings.get("auto_categorize", True)),
+            conflict_action=str(self.app_settings.get("file_conflict", "Auto-rename")),
+        )
+        self._add_task_row(task)
+        if autostart:
+            max_active = int(self.app_settings.get("max_concurrent_downloads", 3))
+            active_count = sum(
+                1
+                for t in self.tasks.values()
+                if t.status in (
+                    Status.DOWNLOADING,
+                    Status.PROBING,
+                    Status.MERGING,
+                    Status.EMBEDDING_SUBS,
+                )
+            )
+            if active_count < max_active:
+                task.start()
+            else:
+                task.status = Status.QUEUED
+        else:
+            task.status = Status.PAUSED
+        self._save_queue()
+        return True
+
+    def _scan_watch_folder(self):
+        if not self.app_settings.get("watch_folder_enabled", False):
+            return
+        watch_path = self.app_settings.get("watch_folder_path")
+        if not watch_path:
+            watch_path = os.path.join(self.save_dir, "Watch")
+        if not os.path.isdir(watch_path):
+            try:
+                os.makedirs(watch_path, exist_ok=True)
+            except OSError:
+                return
+
+        autostart = bool(self.app_settings.get("watch_folder_autostart", True))
+        delete_file = bool(self.app_settings.get("watch_folder_delete_file", False))
+
+        try:
+            entries = os.listdir(watch_path)
+        except OSError:
+            return
+
+        for fname in entries:
+            fpath = os.path.join(watch_path, fname)
+            if not os.path.isfile(fpath) or fname.endswith(
+                (".processed", ".tmp", ".crdownload", ".part", ".bak")
+            ):
+                continue
+            lower_name = fname.lower()
+            urls: List[str] = []
+
+            # 1. Text files (.txt, .urls)
+            if lower_name.endswith((".txt", ".urls")):
+                try:
+                    with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                        for line in f:
+                            raw = line.strip()
+                            if raw and not raw.startswith("#") and (
+                                raw.startswith("http://")
+                                or raw.startswith("https://")
+                                or raw.startswith("magnet:")
+                            ):
+                                urls.append(raw)
+                except Exception:
+                    continue
+
+            # 2. Windows Internet Shortcut (.url)
+            elif lower_name.endswith(".url"):
+                try:
+                    with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                        for line in f:
+                            raw = line.strip()
+                            if raw.lower().startswith("url="):
+                                u = raw[4:].strip()
+                                if u.startswith("http://") or u.startswith("https://"):
+                                    urls.append(u)
+                                    break
+                except Exception:
+                    continue
+
+            if not urls:
+                continue
+
+            queued_count = 0
+            for u in urls:
+                if self._queue_watch_url(u, autostart=autostart):
+                    queued_count += 1
+
+            if queued_count > 0:
+                self.statusBar().showMessage(
+                    f"[Watch Folder] Queued {queued_count} download(s) from '{fname}'",
+                    6000,
+                )
+
+            # Mark processed or delete
+            try:
+                if delete_file:
+                    os.remove(fpath)
+                else:
+                    new_name = f"{fpath}.processed"
+                    if os.path.exists(new_name):
+                        ts = time.strftime("%Y%m%d_%H%M%S")
+                        new_name = f"{fpath}.{ts}.processed"
+                    os.replace(fpath, new_name)
+            except Exception:
+                pass
 
     def get_enabled_ips(self) -> List[str]:
         enabled = self.app_settings.get("enabled_interfaces") or []
@@ -6242,7 +6640,8 @@ class MainWindow(QMainWindow):
         tray_menu.addSeparator()
 
         act_update = tray_menu.addAction("Check for Updates...")
-        act_update.triggered.connect(lambda: self.check_for_updates_manual(interactive=True))
+        act_update.triggered.connect(
+            lambda: self.check_for_updates_manual(interactive=True))
         tray_menu.addSeparator()
 
         act_quit = tray_menu.addAction("Quit CIDM")
@@ -6367,7 +6766,6 @@ class MainWindow(QMainWindow):
 
     def handle_intercepted_download(self, payload: dict):
         self._pending_requests.append(payload)
-        self.bring_to_front()
         if not self._dialog_active:
             QTimer.singleShot(0, self._drain_pending)
 
@@ -6390,22 +6788,41 @@ class MainWindow(QMainWindow):
         ]
         try:
             os.makedirs(os.path.dirname(QUEUE_PATH), exist_ok=True)
-            with open(QUEUE_PATH, "w", encoding="utf-8") as f:
+            tmp_path = QUEUE_PATH + ".tmp"
+            bak_path = QUEUE_PATH + ".bak"
+            with open(tmp_path, "w", encoding="utf-8") as f:
                 json.dump(items, f)
+                f.flush()
+                os.fsync(f.fileno())
             try:
-                os.chmod(QUEUE_PATH, 0o600)
+                os.chmod(tmp_path, 0o600)
             except OSError:
                 pass
+            if os.path.exists(QUEUE_PATH):
+                try:
+                    shutil.copy2(QUEUE_PATH, bak_path)
+                except Exception:
+                    pass
+            os.replace(tmp_path, QUEUE_PATH)
         except OSError:
             pass
 
     def _load_queue(self):
-        try:
-            with open(QUEUE_PATH, "r", encoding="utf-8") as f:
-                items = json.load(f)
-        except (OSError, ValueError):
+        items = None
+        for path in (QUEUE_PATH, QUEUE_PATH + ".bak"):
+            if not os.path.isfile(path):
+                continue
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                if isinstance(data, list):
+                    items = data
+                    break
+            except (OSError, ValueError):
+                continue
+        if not isinstance(items, list):
             return
-        for d in items if isinstance(items, list) else []:
+        for d in items:
             try:
                 self._add_task_row(task_from_dict(d))
             except (KeyError, TypeError, ValueError):
@@ -6457,12 +6874,18 @@ class MainWindow(QMainWindow):
             self.drop_target_widget.raise_()
 
     def open_batch_download(
-        self, prefill_urls: Optional[List[str]] = None, referer: str = ""
+        self,
+        prefill_urls: Optional[List[str]] = None,
+        referer: str = "",
+        cookies: str = "",
+        user_agent: str = "",
     ):
         dlg = BatchDownloadDialog(
             self,
             initial_urls=prefill_urls,
             referer=referer,
+            cookies=cookies,
+            user_agent=user_agent,
             save_dir=self.save_dir,
             threads=self.thread_spin.value(),
         )
@@ -6476,6 +6899,8 @@ class MainWindow(QMainWindow):
                     filename=info["filename"],
                     threads=info["threads"],
                     referer=info.get("referer"),
+                    cookies=info.get("cookies"),
+                    user_agent=info.get("user_agent"),
                     queue_name=info.get(
                         "queue_name", "Main Download Queue"
                     ),
@@ -6499,8 +6924,14 @@ class MainWindow(QMainWindow):
     def handle_batch_requested(self, payload: dict):
         urls = payload.get("urls") or []
         ref = payload.get("referer") or ""
-        self.show_and_activate()
-        self.open_batch_download(prefill_urls=urls, referer=ref)
+        cookies = payload.get("cookies") or ""
+        user_agent = payload.get("user_agent") or ""
+        self.open_batch_download(
+            prefill_urls=urls,
+            referer=ref,
+            cookies=cookies,
+            user_agent=user_agent,
+        )
 
     def open_site_grabber(self):
         dlg = SiteGrabberDialog(

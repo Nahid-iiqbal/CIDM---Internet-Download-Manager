@@ -13,6 +13,7 @@ Features
 """
 from __future__ import annotations
 
+import atexit
 import itertools
 import json
 import os
@@ -32,6 +33,95 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import requests
 from requests.adapters import HTTPAdapter
+
+_TEMP_COOKIE_FILES: set[str] = set()
+
+
+def _cleanup_temp_cookies() -> None:
+    for f in list(_TEMP_COOKIE_FILES):
+        try:
+            if os.path.isfile(f):
+                os.remove(f)
+        except Exception:
+            pass
+    _TEMP_COOKIE_FILES.clear()
+
+
+atexit.register(_cleanup_temp_cookies)
+
+
+def write_mark_of_the_web(file_path: str, url: str = "", referer: str = "") -> None:
+    """Attach Windows Mark-of-the-Web (Zone.Identifier ADS) to downloaded files on Windows NTFS."""
+    if sys.platform != "win32" or not file_path or not os.path.isfile(file_path):
+        return
+    try:
+        ads_path = f"{file_path}:Zone.Identifier"
+        lines = ["[ZoneTransfer]", "ZoneId=3"]
+        if referer and referer.lower().startswith(("http://", "https://")):
+            lines.append(f"ReferrerUrl={referer}")
+        if url and url.lower().startswith(("http://", "https://")):
+            lines.append(f"HostUrl={url}")
+        content = "\r\n".join(lines) + "\r\n"
+        with open(ads_path, "w", encoding="utf-8") as f:
+            f.write(content)
+    except Exception:
+        pass  # Non-NTFS drives (FAT32, exFAT) or read-only filesystems do not support streams
+
+
+def protect_secret_string(plain: Optional[str]) -> str:
+    """Encrypt sensitive credentials/cookies at rest using Windows DPAPI."""
+    if not plain or not isinstance(plain, str):
+        return ""
+    if sys.platform != "win32":
+        return plain
+    try:
+        import base64
+        import ctypes
+        from ctypes import wintypes
+
+        class DATA_BLOB(ctypes.Structure):
+            _fields_ = [("cbData", wintypes.DWORD), ("pbData", ctypes.POINTER(ctypes.c_char))]
+
+        raw = plain.encode("utf-8")
+        b_data = ctypes.create_string_buffer(raw)
+        in_blob = DATA_BLOB(len(raw), ctypes.cast(b_data, ctypes.POINTER(ctypes.c_char)))
+        out_blob = DATA_BLOB()
+        if not ctypes.windll.crypt32.CryptProtectData(ctypes.byref(in_blob), "CIDMCookie", None, None, None, 0, ctypes.byref(out_blob)):
+            return plain
+        res = ctypes.string_at(out_blob.pbData, out_blob.cbData)
+        ctypes.windll.kernel32.LocalFree(out_blob.pbData)
+        return "dpapi:" + base64.b64encode(res).decode("ascii")
+    except Exception:
+        return plain
+
+
+def unprotect_secret_string(cipher: Optional[str]) -> str:
+    """Decrypt sensitive credentials/cookies at rest using Windows DPAPI."""
+    if not cipher or not isinstance(cipher, str):
+        return ""
+    if not cipher.startswith("dpapi:"):
+        return cipher
+    if sys.platform != "win32":
+        return ""
+    try:
+        import base64
+        import ctypes
+        from ctypes import wintypes
+
+        class DATA_BLOB(ctypes.Structure):
+            _fields_ = [("cbData", wintypes.DWORD), ("pbData", ctypes.POINTER(ctypes.c_char))]
+
+        raw = base64.b64decode(cipher[6:])
+        b_data = ctypes.create_string_buffer(raw)
+        in_blob = DATA_BLOB(len(raw), ctypes.cast(b_data, ctypes.POINTER(ctypes.c_char)))
+        out_blob = DATA_BLOB()
+        if not ctypes.windll.crypt32.CryptUnprotectData(ctypes.byref(in_blob), None, None, None, None, 0, ctypes.byref(out_blob)):
+            return ""
+        res = ctypes.string_at(out_blob.pbData, out_blob.cbData)
+        ctypes.windll.kernel32.LocalFree(out_blob.pbData)
+        return res.decode("utf-8", errors="replace")
+    except Exception:
+        return ""
 
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -231,8 +321,8 @@ def create_temp_cookiefile(cookies_str: Optional[str], target_url: str) -> Optio
             if not item or "=" not in item:
                 continue
             name, val = item.split("=", 1)
-            name = name.strip()
-            val = val.strip()
+            name = re.sub(r'[\r\n\t]+', '', name.strip())
+            val = re.sub(r'[\r\n\t]+', '', val.strip())
             if name:
                 lines.append(
                     f"{cookie_domain}\tTRUE\t/\tFALSE\t2147483647\t{name}\t{val}\n"
@@ -248,6 +338,7 @@ def create_temp_cookiefile(cookies_str: Optional[str], target_url: str) -> Optio
         )
         tf.writelines(lines)
         tf.close()
+        _TEMP_COOKIE_FILES.add(tf.name)
         return tf.name
     except Exception:
         return None
@@ -724,17 +815,22 @@ def build_headers(
     referer: Optional[str] = None,
     extra: Optional[Dict[str, str]] = None,
 ) -> Dict[str, str]:
+    def _strip_crlf(val: Optional[str]) -> str:
+        return re.sub(r'[\r\n]+', ' ', str(val or "")).strip()
+
+    ua = _strip_crlf(user_agent) if user_agent else DEFAULT_USER_AGENT
     headers = {
-        "User-Agent": user_agent or DEFAULT_USER_AGENT,
+        "User-Agent": ua,
         "Accept": "*/*",
         "Accept-Encoding": "identity",  # raw bytes: ranges must match file offsets
     }
     if referer:
-        headers["Referer"] = referer
+        headers["Referer"] = _strip_crlf(referer)
     if cookies:
-        headers["Cookie"] = cookies
+        headers["Cookie"] = _strip_crlf(cookies)
     if extra:
-        headers.update(extra)
+        for k, v in extra.items():
+            headers[_strip_crlf(k)] = _strip_crlf(v)
     return headers
 
 
@@ -790,6 +886,7 @@ def probe_url(
     user_agent: Optional[str] = None,
     referer: Optional[str] = None,
     timeout: tuple = (CONNECT_TIMEOUT, 20),
+    _depth: int = 0,
 ) -> ProbeResult:
     """HEAD the URL (following redirects). If HEAD fails or gives no length,
     fall back to a 1-byte ranged GET which also reveals range support."""
@@ -851,7 +948,7 @@ def probe_url(
                 final_url = r.url or final_url
 
                 # Check for Google Drive virus warning HTML confirmation page
-                if "google.com" in final_url or "googleusercontent.com" in final_url:
+                if _depth < 3 and ("google.com" in final_url or "googleusercontent.com" in final_url):
                     c_type = (r.headers.get("Content-Type") or "").lower()
                     if "text/html" in c_type:
                         try:
@@ -861,7 +958,7 @@ def probe_url(
                                 conf_link = m_confirm.group(1).replace("&amp;", "&")
                                 if conf_link.startswith("/"):
                                     conf_link = "https://drive.google.com" + conf_link
-                                return probe_url(conf_link, cookies, user_agent, referer, timeout)
+                                return probe_url(conf_link, cookies, user_agent, referer, timeout, _depth + 1)
                             m_token = re.search(r'name="confirm"\s+value="([^"]+)"', chunk) or re.search(r'confirm=([0-9A-Za-z_-]+)', chunk)
                             if m_token:
                                 token = m_token.group(1)
@@ -869,7 +966,7 @@ def probe_url(
                                     confirmed_url = f"{final_url}&confirm={token}"
                                 else:
                                     confirmed_url = re.sub(r'confirm=[^&]*', f'confirm={token}', final_url)
-                                return probe_url(confirmed_url, cookies, user_agent, referer, timeout)
+                                return probe_url(confirmed_url, cookies, user_agent, referer, timeout, _depth + 1)
                         except Exception:
                             pass
             finally:
@@ -964,7 +1061,7 @@ class DownloadTask:
             "save_dir": self.save_dir,
             "filename": self.filename,
             "threads": self.threads,
-            "cookies": self.cookies,
+            "cookies": protect_secret_string(self.cookies),
             "user_agent": self.user_agent,
             "referer": self.referer,
             "file_size": self.file_size,
@@ -986,7 +1083,7 @@ class DownloadTask:
             d["save_dir"],
             d.get("filename") or None,
             d.get("threads", 8),
-            d.get("cookies"),
+            unprotect_secret_string(d.get("cookies")),
             d.get("user_agent"),
             d.get("referer"),
             subtitle_track=d.get("subtitle_track"),
@@ -1670,6 +1767,18 @@ class DownloadTask:
             if self._pause_flag.is_set():
                 self.status = Status.PAUSED
                 return
+            # Disk safety: verify available drive space before file allocation/writing
+            if self.file_size and self.file_size > 0:
+                try:
+                    usage = shutil.disk_usage(self.save_dir)
+                    needed = max(0, self.file_size - self.downloaded)
+                    if usage.free < (needed + 50 * 1024 * 1024):
+                        free_mb = usage.free / (1024 * 1024)
+                        needed_mb = needed / (1024 * 1024)
+                        self._fail(f"Not enough disk space (need {needed_mb:.1f} MB, {free_mb:.1f} MB free)")
+                        return
+                except Exception:
+                    pass
             if self.supports_ranges and self.file_size > 0:
                 self._run_segmented()
             else:
@@ -1789,6 +1898,7 @@ class DownloadTask:
             self.speed = 0.0
             self._process_subtitles()
             self.status = Status.COMPLETED
+            write_mark_of_the_web(self.dest_path, self.url, self.referer)
         elif self._abort_flag.is_set():
             self._save_state()
             self._close_file()
@@ -2014,6 +2124,7 @@ class DownloadTask:
             self._close_file()
             self._process_subtitles()
             self.status = Status.COMPLETED
+            write_mark_of_the_web(self.dest_path, self.url, self.referer)
         elif self._abort_flag.is_set():
             self._close_file()
             self.status = Status.ERROR
@@ -2073,6 +2184,10 @@ class DownloadTask:
                             with self._lock:
                                 self.file_size = total
                                 self.segments[0]["end"] = total - 1
+                        else:
+                            with self._lock:
+                                self.file_size = None
+                                self.segments[0]["end"] = None
                     for chunk in resp.iter_content(CHUNK_SIZE):
                         if self._should_stop():
                             return
@@ -2123,6 +2238,32 @@ _ATTR_RE = re.compile(r'([A-Z0-9-]+)=("[^"]*"|[^,]*)')
 
 def _parse_attrs(text: str) -> Dict[str, str]:
     return {k: v.strip('"') for k, v in _ATTR_RE.findall(text)}
+
+
+DRM_FRIENDLY_MESSAGE = (
+    "This stream is DRM-protected (Widevine/PlayReady) and cannot be downloaded."
+)
+
+
+def is_drm_error(err: Any) -> bool:
+    """Return True if an error indicates DRM encryption or protection."""
+    txt = str(err or "").lower()
+    keywords = (
+        "drm protected",
+        "drm-protected",
+        "drm protection",
+        "widevine",
+        "playready",
+        "fairplay",
+        "sample-aes",
+        "unsupported encryption",
+        "key format not supported",
+        "encryption format not supported",
+        "this video is drm",
+        "encrypted stream",
+        "drm is not supported",
+    )
+    return any(k in txt for k in keywords)
 
 
 def is_hls_url(url: str) -> bool:
@@ -2267,9 +2408,7 @@ class HlsDownloadTask(DownloadTask):
                         "iv": a.get("IV"),
                     }
                 else:
-                    raise DownloadError(
-                        "This stream is DRM-protected or uses unsupported encryption"
-                    )
+                    raise DownloadError(DRM_FRIENDLY_MESSAGE)
             elif line.startswith("#EXT-X-MAP:"):
                 a = _parse_attrs(line.split(":", 1)[1])
                 if "BYTERANGE" in a or not a.get("URI"):
@@ -2534,17 +2673,27 @@ class HlsDownloadTask(DownloadTask):
             cached = self._keys.get(uri)
         if cached:
             return cached
-        r = requests.get(
-            uri,
-            headers=build_headers(self.cookies, self.user_agent, self.referer),
-            allow_redirects=True,
-            timeout=(CONNECT_TIMEOUT, 20),
+        routes = self._build_routes()
+        primary_route = routes[0] if routes else {"source_ip": None, "proxy": None}
+        session = create_bound_session(
+            source_ip=primary_route.get("source_ip"),
+            proxy=primary_route.get("proxy"),
         )
-        if r.status_code >= 400 or len(r.content) != 16:
-            raise DownloadError("Could not fetch the stream's decryption key")
+        try:
+            r = session.get(
+                uri,
+                headers=build_headers(self.cookies, self.user_agent, self.referer),
+                allow_redirects=True,
+                timeout=(CONNECT_TIMEOUT, 20),
+            )
+            if r.status_code >= 400 or len(r.content) != 16:
+                raise DownloadError("Could not fetch the stream's decryption key")
+            content = r.content
+        finally:
+            session.close()
         with self._lock:
-            self._keys[uri] = r.content
-        return r.content
+            self._keys[uri] = content
+        return content
 
     def _decrypt(self, data: bytes, item: Dict[str, Any]) -> bytes:
         try:
@@ -2622,6 +2771,7 @@ class HlsDownloadTask(DownloadTask):
         shutil.rmtree(self.parts_dir, ignore_errors=True)
         self._process_subtitles()
         self.status = Status.COMPLETED
+        write_mark_of_the_web(self.path, self.url, self.referer)
 
 
 # --------------------------------------------------------------------------- #
@@ -2802,6 +2952,8 @@ def probe_media(
                 info = ydl.extract_info(url, download=False)
         except Exception as exc:
             err_msg = str(exc)
+            if is_drm_error(err_msg):
+                raise DownloadError(DRM_FRIENDLY_MESSAGE) from exc
             # If extraction failed with cookies (e.g. YouTube n-challenge / bot detection / format restriction),
             # retry cleanly without cookies
             if cookie_file and any(
@@ -2837,6 +2989,8 @@ def probe_media(
                         default_filename=f"{sanitized}.mp4",
                         is_live=False,
                     )
+                if is_drm_error(str(exc)):
+                    raise DownloadError(DRM_FRIENDLY_MESSAGE) from exc
                 raise DownloadError(f"yt-dlp probe failed: {exc}") from exc
     finally:
         if cookie_file and os.path.exists(cookie_file):
@@ -3133,7 +3287,7 @@ class MediaDownloadTask(DownloadTask):
             d["save_dir"],
             d.get("filename") or None,
             d.get("threads", 8),
-            d.get("cookies"),
+            unprotect_secret_string(d.get("cookies")),
             d.get("user_agent"),
             d.get("referer"),
             origin=d.get("origin"),
@@ -3426,6 +3580,10 @@ class MediaDownloadTask(DownloadTask):
         except Exception as exc:
             if self._cancel_flag.is_set():
                 self._finish_cancel()
+            elif is_drm_error(str(exc)):
+                self.error = DRM_FRIENDLY_MESSAGE
+                self.status = Status.ERROR
+                self.speed = 0.0
             else:
                 self.error = str(exc) or exc.__class__.__name__
                 self.status = Status.ERROR
@@ -3439,17 +3597,25 @@ class MediaDownloadTask(DownloadTask):
                 "FFmpeg is required to download this stream, but was not found on PATH."
             )
 
+        def _clean_hdr(v: str) -> str:
+            return re.sub(r'[\r\n]+', ' ', str(v or "")).strip()
+
         headers_str = ""
         if self.referer:
-            headers_str += f"Referer: {self.referer}\r\n"
+            headers_str += f"Referer: {_clean_hdr(self.referer)}\r\n"
         if self.origin:
-            headers_str += f"Origin: {self.origin}\r\n"
+            headers_str += f"Origin: {_clean_hdr(self.origin)}\r\n"
         if self.user_agent:
-            headers_str += f"User-Agent: {self.user_agent}\r\n"
+            headers_str += f"User-Agent: {_clean_hdr(self.user_agent)}\r\n"
         if self.cookies:
-            headers_str += f"Cookie: {self.cookies}\r\n"
+            headers_str += f"Cookie: {_clean_hdr(self.cookies)}\r\n"
 
-        cmd = [ffmpeg_exe, "-y"]
+        cmd = [
+            ffmpeg_exe,
+            "-y",
+            "-protocol_whitelist",
+            "file,http,https,tcp,tls,crypto",
+        ]
         if headers_str:
             cmd.extend(["-headers", headers_str])
         cmd.extend([
@@ -3477,10 +3643,15 @@ class MediaDownloadTask(DownloadTask):
 
         last_time = time.monotonic()
         last_bytes = 0
+        err_tail: List[str] = []
 
         try:
             for raw_line in proc.stderr:
                 line = raw_line.strip()
+                if line:
+                    err_tail.append(line)
+                    if len(err_tail) > 25:
+                        err_tail.pop(0)
                 if self._cancel_flag.is_set() or self._pause_flag.is_set():
                     proc.terminate()
                     break
@@ -3537,6 +3708,11 @@ class MediaDownloadTask(DownloadTask):
             return
 
         if proc.returncode != 0:
+            tail_msg = " ".join(err_tail)
+            if is_drm_error(tail_msg) or any(
+                k in tail_msg.lower() for k in ("crypto", "key file", "sample-aes", "drm")
+            ):
+                raise DownloadError(DRM_FRIENDLY_MESSAGE)
             raise DownloadError(f"FFmpeg exited with code {proc.returncode}")
 
         if os.path.exists(output_path):
@@ -3547,9 +3723,12 @@ class MediaDownloadTask(DownloadTask):
                 self.eta = 0.0
                 self.percent_from_hook = 100.0
                 self.merge_state = "Completed"
+            if self.filename:
+                write_mark_of_the_web(os.path.join(self.save_dir, self.filename), self.url, self.referer)
                 self.filename = os.path.basename(output_path)
                 self.file_size = os.path.getsize(output_path)
                 self.downloaded = self.file_size
+            write_mark_of_the_web(output_path, self.url, self.referer)
 
     def _run_media(self) -> None:
         try:
@@ -3712,6 +3891,8 @@ class MediaDownloadTask(DownloadTask):
                 self.eta = 0.0
                 self.percent_from_hook = 100.0
                 self.merge_state = "Completed"
+            if self.filename:
+                write_mark_of_the_web(os.path.join(self.save_dir, self.filename), self.url, self.referer)
 
         except yt_dlp.utils.DownloadError as exc:
             msg = str(exc)
@@ -3720,6 +3901,12 @@ class MediaDownloadTask(DownloadTask):
                 return
             elif self._pause_flag.is_set() or "Paused" in msg:
                 self.status = Status.PAUSED
+                self.speed = 0.0
+                return
+
+            if is_drm_error(msg):
+                self.error = DRM_FRIENDLY_MESSAGE
+                self.status = Status.ERROR
                 self.speed = 0.0
                 return
 
@@ -3747,6 +3934,10 @@ class MediaDownloadTask(DownloadTask):
         except Exception as exc:
             if self._cancel_flag.is_set():
                 self._finish_cancel()
+            elif is_drm_error(str(exc)):
+                self.error = DRM_FRIENDLY_MESSAGE
+                self.status = Status.ERROR
+                self.speed = 0.0
             else:
                 is_hls = (
                     ".m3u8" in self.url.lower() or self.stream_type == "hls"
@@ -3878,12 +4069,28 @@ def create_task(
             )
             save_dir, filename = os.path.split(full_path)
 
-    is_media = (
-        kind in ("media", "hls", "dash")
+    # Route pure HLS streams to specialized HlsDownloadTask unless yt-dlp media extraction is requested
+    if kind == "hls" or (is_hls_url(url) and not format_id and kind != "media"):
+        task = HlsDownloadTask(
+            url,
+            save_dir,
+            filename,
+            threads,
+            cookies,
+            user_agent,
+            referer,
+            subtitle_track=subtitle_track,
+            subtitle_mode=subtitle_mode,
+            selected_ips=selected_ips,
+            proxy_pool=proxy_pool,
+            proxy_pool_enabled=proxy_pool_enabled,
+            proxy_pool_include_direct=proxy_pool_include_direct,
+        )
+    elif (
+        kind in ("media", "dash")
         or (stream_type and stream_type.lower() in ("hls", "dash", "media"))
         or is_media_url(url)
-    )
-    if is_media:
+    ):
         task = MediaDownloadTask(
             url,
             save_dir,
@@ -3897,22 +4104,6 @@ def create_task(
             format_id=format_id,
             quality_label=quality_label,
             media_title=media_title,
-            subtitle_track=subtitle_track,
-            subtitle_mode=subtitle_mode,
-            selected_ips=selected_ips,
-            proxy_pool=proxy_pool,
-            proxy_pool_enabled=proxy_pool_enabled,
-            proxy_pool_include_direct=proxy_pool_include_direct,
-        )
-    elif kind == "hls" or is_hls_url(url):
-        task = HlsDownloadTask(
-            url,
-            save_dir,
-            filename,
-            threads,
-            cookies,
-            user_agent,
-            referer,
             subtitle_track=subtitle_track,
             subtitle_mode=subtitle_mode,
             selected_ips=selected_ips,

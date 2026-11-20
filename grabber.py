@@ -19,7 +19,7 @@ DEFAULT_USER_AGENT = (
 
 PRESET_EXTENSIONS = {
     "images": {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg", ".ico", ".tiff"},
-    "videos": {".mp4", ".mkv", ".webm", ".avi", ".mov", ".flv", ".wmv", ".m4v", ".ts", ".m3u8", ".mpd"},
+    "videos": {".mp4", ".mkv", ".webm", ".avi", ".mov", ".flv", ".wmv", ".m4v", ".m3u8", ".mpd"},
     "audio": {".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".wma", ".opus"},
     "documents": {".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".rtf", ".odt"},
     "archives": {".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz", ".iso", ".exe", ".msi", ".dmg"},

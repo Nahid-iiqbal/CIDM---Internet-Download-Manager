@@ -23,26 +23,54 @@ from typing import Optional, Dict, Any, List
 import requests
 from PySide6.QtCore import QObject, QThread, Signal
 
-APP_VERSION = "1.0.1"
+APP_VERSION = "1.0.3"
 GITHUB_REPO = "Nahid-iiqbal/CIDM---Internet-Download-Manager"
 RELEASES_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 RELEASES_HTML_URL = f"https://github.com/{GITHUB_REPO}/releases"
 
 
 def parse_version(v: str) -> tuple:
-    """Extract integer version components from tag or string."""
-    m = re.findall(r"\d+", str(v))
-    return tuple(map(int, m)) if m else (0,)
+    """Extract semantic version components (major, minor, patch, build, is_final, prerelease)."""
+    s = str(v).strip()
+    # Check if there is an explicit version tag like v1.2.0 or standard semver X.Y.Z
+    m_v = re.search(
+        r"v(\d+)\.(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:-([0-9A-Za-z.-]+))?",
+        s,
+        re.IGNORECASE,
+    )
+    if m_v:
+        m = m_v
+    else:
+        m = re.search(
+            r"(\d+)\.(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:-([0-9A-Za-z.-]+))?", s
+        )
+
+    if not m:
+        m_simple = re.search(r"(\d+)", s)
+        return (int(m_simple.group(1)) if m_simple else 0, 0, 0, 0, 1, "")
+
+    major = int(m.group(1))
+    minor = int(m.group(2))
+    patch = int(m.group(3)) if m.group(3) is not None else 0
+    build = int(m.group(4)) if m.group(4) is not None else 0
+    prerelease = m.group(5) or ""
+    # SemVer 2.0.0: Normal final release has higher precedence than any pre-release
+    is_final = 0 if prerelease else 1
+    return (major, minor, patch, build, is_final, prerelease)
 
 
 def is_newer_version(latest_tag: str, current_version: str = APP_VERSION) -> bool:
     """Check if latest_tag represents a strictly newer version than current_version."""
-    v_latest = parse_version(latest_tag)
-    v_current = parse_version(current_version)
-    max_len = max(len(v_latest), len(v_current))
-    v_latest += (0,) * (max_len - len(v_latest))
-    v_current += (0,) * (max_len - len(v_current))
-    return v_latest > v_current
+    p_l = parse_version(latest_tag)
+    p_c = parse_version(current_version)
+    # Core numerical version comparison (major, minor, patch, build)
+    if p_l[:4] != p_c[:4]:
+        return p_l[:4] > p_c[:4]
+    # If core numbers are equal: final release (1) > pre-release (0)
+    if p_l[4] != p_c[4]:
+        return p_l[4] > p_c[4]
+    # Both are pre-releases: lexicographical comparison
+    return p_l[5] > p_c[5]
 
 
 @dataclass
@@ -81,54 +109,51 @@ class UpdateInfo:
 def check_for_update(
     current_version: str = APP_VERSION, timeout: float = 6.0
 ) -> Optional[UpdateInfo]:
-    """Synchronously query GitHub API for the latest release."""
+    """Synchronously query GitHub API for the latest release. Raises on network/HTTP errors."""
     headers = {
         "User-Agent": f"CIDM-AutoUpdater/{current_version}",
         "Accept": "application/vnd.github.v3+json",
     }
-    try:
-        resp = requests.get(RELEASES_API_URL, headers=headers, timeout=timeout)
-        if resp.status_code != 200:
-            return None
-        data = resp.json()
-        tag = data.get("tag_name", "")
-        if not tag:
-            return None
+    resp = requests.get(RELEASES_API_URL, headers=headers, timeout=timeout)
+    if resp.status_code != 200:
+        raise RuntimeError(f"GitHub API returned HTTP {resp.status_code}")
+    data = resp.json()
+    tag = data.get("tag_name", "")
+    if not tag:
+        raise ValueError("GitHub release contains no tag_name")
 
-        # Check if newer
-        if not is_newer_version(tag, current_version):
-            return None
+    # Check if newer
+    if not is_newer_version(tag, current_version):
+        return None  # Up to date
 
-        assets = []
-        inst_asset = None
-        port_asset = None
-        for a in data.get("assets", []):
-            ra = ReleaseAsset(
-                name=a.get("name", ""),
-                url=a.get("browser_download_url", ""),
-                size=int(a.get("size", 0)),
-                content_type=a.get("content_type", ""),
-            )
-            assets.append(ra)
-            name_lower = ra.name.lower()
-            if "setup" in name_lower and name_lower.endswith(".exe"):
-                inst_asset = ra
-            elif "portable" in name_lower and name_lower.endswith(".zip"):
-                port_asset = ra
-
-        return UpdateInfo(
-            version=tag.lstrip("vV"),
-            tag_name=tag,
-            title=data.get("name", tag),
-            body=data.get("body", ""),
-            html_url=data.get("html_url", RELEASES_HTML_URL),
-            published_at=data.get("published_at", ""),
-            installer_asset=inst_asset,
-            portable_asset=port_asset,
-            all_assets=assets,
+    assets = []
+    inst_asset = None
+    port_asset = None
+    for a in data.get("assets", []):
+        ra = ReleaseAsset(
+            name=a.get("name", ""),
+            url=a.get("browser_download_url", ""),
+            size=int(a.get("size", 0)),
+            content_type=a.get("content_type", ""),
         )
-    except Exception:
-        return None
+        assets.append(ra)
+        name_lower = ra.name.lower()
+        if "setup" in name_lower and name_lower.endswith(".exe"):
+            inst_asset = ra
+        elif "portable" in name_lower and name_lower.endswith(".zip"):
+            port_asset = ra
+
+    return UpdateInfo(
+        version=tag.lstrip("vV"),
+        tag_name=tag,
+        title=data.get("name", tag),
+        body=data.get("body", ""),
+        html_url=data.get("html_url", RELEASES_HTML_URL),
+        published_at=data.get("published_at", ""),
+        installer_asset=inst_asset,
+        portable_asset=port_asset,
+        all_assets=assets,
+    )
 
 
 class UpdateCheckWorker(QThread):
@@ -161,39 +186,70 @@ class UpdateDownloadWorker(QThread):
     """Background thread to download update package with progress reporting."""
 
     progress = Signal(int, int, int, float)  # percent, downloaded_bytes, total_bytes, speed_kbps
-    finished = Signal(str)                  # local_file_path
+    completed = Signal(str)                 # local_file_path (avoids shadowing QThread.finished)
+    finished = completed                    # backwards-compatibility alias
     failed = Signal(str)                    # error message
+    cancelled = Signal()                    # user-initiated cancellation
 
     def __init__(
         self,
         asset_url: str,
         target_filename: str,
+        expected_size: int = 0,
+        expected_sha256: str = "",
         parent: Optional[QObject] = None,
     ):
         super().__init__(parent)
         self.asset_url = asset_url
         self.target_filename = target_filename
+        self.expected_size = expected_size
+        self.expected_sha256 = expected_sha256.strip().lower()
         self._is_cancelled = False
 
     def cancel(self):
         self._is_cancelled = True
 
     def run(self):
-        temp_dir = os.path.join(tempfile.gettempdir(), "cidm_update")
+        # Validate asset URL to ensure it originates from official GitHub Release endpoints
+        try:
+            parsed = urllib.parse.urlparse(self.asset_url)
+            host = (parsed.hostname or "").lower()
+            if parsed.scheme != "https" or not (
+                host == "github.com"
+                or host.endswith(".github.com")
+                or host.endswith(".githubusercontent.com")
+            ):
+                self.failed.emit(f"Untrusted download host: {host}")
+                return
+        except Exception as e:
+            self.failed.emit(f"Invalid download URL: {e}")
+            return
+
+        temp_dir = os.path.abspath(os.path.join(tempfile.gettempdir(), "cidm_update"))
         os.makedirs(temp_dir, exist_ok=True)
-        dest_path = os.path.join(temp_dir, self.target_filename)
+
+        # Sanitize filename to prevent directory traversal or writing outside temp_dir
+        safe_name = os.path.basename(str(self.target_filename or "")).strip()
+        safe_name = re.sub(r'[\/\\:*?"<>|]', '_', safe_name).strip()
+        if not safe_name:
+            safe_name = "CIDM_Update.exe"
+        dest_path = os.path.abspath(os.path.join(temp_dir, safe_name))
+        if not dest_path.startswith(temp_dir):
+            dest_path = os.path.join(temp_dir, "CIDM_Update.exe")
 
         headers = {
             "User-Agent": f"CIDM-AutoUpdater/{APP_VERSION}",
             "Accept": "*/*",
         }
 
+        hasher = hashlib.sha256()
+
         try:
             with requests.get(
                 self.asset_url, headers=headers, stream=True, timeout=20.0
             ) as r:
                 r.raise_for_status()
-                total_size = int(r.headers.get("content-length", 0))
+                total_size = int(r.headers.get("content-length", 0)) or self.expected_size
                 downloaded = 0
                 start_time = time.time()
                 last_time = start_time
@@ -206,11 +262,12 @@ class UpdateDownloadWorker(QThread):
                                 os.remove(dest_path)
                             except Exception:
                                 pass
-                            self.failed.emit("Download cancelled by user.")
+                            self.cancelled.emit()
                             return
 
                         if chunk:
                             f.write(chunk)
+                            hasher.update(chunk)
                             downloaded += len(chunk)
 
                             now = time.time()
@@ -231,9 +288,40 @@ class UpdateDownloadWorker(QThread):
                                 )
                                 last_time = now
 
-            self.finished.emit(dest_path)
+            if self._is_cancelled:
+                try:
+                    os.remove(dest_path)
+                except Exception:
+                    pass
+                self.cancelled.emit()
+                return
+
+            if self.expected_size > 0 and downloaded != self.expected_size:
+                try:
+                    os.remove(dest_path)
+                except Exception:
+                    pass
+                self.failed.emit(
+                    f"Size verification failed: expected {self.expected_size} bytes, got {downloaded} bytes."
+                )
+                return
+
+            if self.expected_sha256:
+                actual_sha = hasher.hexdigest().lower()
+                if actual_sha != self.expected_sha256:
+                    try:
+                        os.remove(dest_path)
+                    except Exception:
+                        pass
+                    self.failed.emit(
+                        f"Checksum verification failed (SHA-256 mismatch)."
+                    )
+                    return
+
+            self.completed.emit(dest_path)
         except Exception as e:
-            self.failed.emit(str(e))
+            if not self._is_cancelled:
+                self.failed.emit(str(e))
 
 
 def is_running_frozen() -> bool:
@@ -320,6 +408,12 @@ chcp 65001 >nul
 echo Updating CIDM Portable...
 timeout /t 2 /nobreak >nul
 robocopy "{source_content_dir}" "{target_app_dir}" /E /IS /IT /NP /NJH /NJS /R:3 /W:1
+if errorlevel 8 (
+    echo [ERROR] CIDM Portable update failed to copy files.
+    echo Please make sure CIDM is completely closed and try again.
+    pause
+    exit /b 1
+)
 start "" "{exe_target}"
 timeout /t 1 /nobreak >nul
 (goto) 2>nul & del "%~f0"
